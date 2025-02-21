@@ -5,6 +5,7 @@ import javax.swing.table.DefaultTableModel;
 import src.errors.ErrorHandler;
 import src.validators.IdentifierValidator;
 import src.validators.TypeValidator;
+import src.validators.OperatorValidator;
 
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.Component;
@@ -70,11 +71,23 @@ public class SymbolTable extends JTable {
             declaration = declaration.trim();
             if (declaration.isEmpty()) continue;
 
-            // Check for assignment
-            if (declaration.contains("=")) {
+            // Check if it's a declaration with initialization (contains type and =)
+            if (declaration.matches("(IntegerType|FloatType|StringType)\\s+.*=.*")) {
+                String[] parts = declaration.split("=");
+                // Process declaration part
+                processDeclaration(parts[0], lineNumber, errorTable);
+                // Process assignment part
+                if (parts.length > 1) {
+                    String identifier = parts[0].split("\\s+")[1].trim();
+                    processAssignment(identifier + "=" + parts[1], lineNumber, errorTable);
+                }
+            }
+            // Check for regular assignment
+            else if (declaration.contains("=")) {
                 processAssignment(declaration, lineNumber, errorTable);
-            } else {
-                // Process declaration
+            }
+            // Regular declaration
+            else {
                 processDeclaration(declaration, lineNumber, errorTable);
             }
         }
@@ -119,14 +132,14 @@ public class SymbolTable extends JTable {
 
             // Validate identifier using IdentifierValidator
             if (!IdentifierValidator.isValidIdentifier(identifier)) {
-                errorTable.addError("Invalid Identifier", identifier, lineNumber, 
+                errorTable.addError("Invalid Identifier", identifier, lineNumber,
                     ErrorHandler.getErrorMessage("INVALID_IDENTIFIER"));
                 continue;
             }
 
             // Check for duplicate declarations
             if (symbolMap.containsKey(identifier)) {
-                errorTable.addError("Duplicate Declaration", identifier, lineNumber, 
+                errorTable.addError("Duplicate Declaration", identifier, lineNumber,
                     "Variable already declared");
                 continue;
             }
@@ -142,45 +155,37 @@ public class SymbolTable extends JTable {
     }
 
     private void processAssignment(String assignment, int lineNumber, ErrorTable errorTable) {
-        String[] parts = assignment.split("=");
-        if (parts.length != 2) {
-            errorTable.addError("Syntax Error", assignment, lineNumber,
-                "Invalid assignment format");
-            return;
-        }
+        String[] parts = assignment.split("((?<=[=+\\-*/])|(?=[=+\\-*/]))");
+        String currentIdentifier = null;
 
-        String identifier = parts[0].trim();
-        String expression = parts[1].trim();
+        for (String part : parts) {
+            part = part.trim();
+            if (part.isEmpty()) continue;
 
-        // Check if variable is declared
-        if (!symbolMap.containsKey(identifier)) {
-            errorTable.addError("Undeclared Variable", identifier, lineNumber,
-                "Variable must be declared before use");
-            return;
-        }
-
-        // Check expression
-        String[] operands = expression.split("[\\+\\-\\*\\/]");
-        String targetType = symbolMap.get(identifier);
-
-        for (String operand : operands) {
-            operand = operand.trim();
-            if (IdentifierValidator.isValidIdentifier(operand)) {
-                // Check if operand is declared
-                if (!symbolMap.containsKey(operand)) {
-                    errorTable.addError("Undeclared Variable", operand, lineNumber,
+            if (OperatorValidator.isOperator(part)) {
+                // Add operator to symbol table
+                symbolMap.put(part, OperatorValidator.getOperatorType(part));
+                model.addRow(new Object[]{part, OperatorValidator.getOperatorType(part)});
+            } else if (IdentifierValidator.isValidIdentifier(part)) {
+                // Es un identificador
+                if (!symbolMap.containsKey(part)) {
+                    errorTable.addError("Undeclared Variable", part, lineNumber,
                         "Variable must be declared before use");
                     return;
                 }
-                // Check type compatibility using TypeValidator
-                String operandType = symbolMap.get(operand);
-                if (!TypeValidator.areTypesCompatible(targetType, operandType)) {
-                    errorTable.addError("Type Mismatch", operand, lineNumber,
-                        ErrorHandler.getErrorMessage("TYPE_MISMATCH", targetType, operandType));
+                currentIdentifier = part;
+            } else {
+                // Literal value
+                if (currentIdentifier != null) {
+                    String targetType = symbolMap.get(currentIdentifier);
+                    if (!TypeValidator.isValidValueForType(targetType, part)) {
+                        errorTable.addError("Type Mismatch", part, lineNumber,
+                            "Value does not match variable type " + targetType);
+                        return;
+                    }
+                    // Add literal value to symbol table
+                    model.addRow(new Object[]{part, targetType});
                 }
-            } else if (!isValidValueForType(targetType, operand)) {
-                errorTable.addError("Type Mismatch", operand, lineNumber,
-                    "Value does not match variable type " + targetType);
             }
         }
     }
