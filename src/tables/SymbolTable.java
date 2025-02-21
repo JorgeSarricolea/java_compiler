@@ -14,10 +14,7 @@ import java.awt.Color;
 public class SymbolTable extends JTable {
     private DefaultTableModel model;
     private HashMap<String, String> symbolMap;
-    
-    // Valid types
-    private static final String[] VALID_TYPES = {"IntegerType", "FloatType", "StringType"};
-    
+
     // Identifier patterns for each type
     private static final String IDENTIFIER_PATTERN = "JSJ[a-z][0-9]+";
 
@@ -36,13 +33,13 @@ public class SymbolTable extends JTable {
         model.addColumn("Lexeme");
         model.addColumn("Type");
         setModel(model);
-        
+
         // Configure table appearance
         setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
         getColumnModel().getColumn(0).setPreferredWidth(150);
         getColumnModel().getColumn(1).setPreferredWidth(150);
         setRowHeight(getRowHeight() + 10);
-        
+
         setBackground(DARKER_BG);
         setForeground(DARK_TEXT);
         getTableHeader().setBackground(DARK_BG);
@@ -50,8 +47,7 @@ public class SymbolTable extends JTable {
         setGridColor(new Color(70, 70, 70));
         setSelectionBackground(SELECTION_BG);
         setSelectionForeground(Color.WHITE);
-        
-        // Actualizar el renderer
+
         setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
             @Override
             public Component getTableCellRendererComponent(JTable table, Object value,
@@ -120,10 +116,10 @@ public class SymbolTable extends JTable {
                 symbolMap.put(",", "Delimiter");
                 model.addRow(new Object[]{",", "Delimiter"});
             }
-            
+
             // Remove trailing comma if present
             String identifier = id.replace(",", "").trim();
-            
+
             // Validate identifier using IdentifierValidator
             if (!IdentifierValidator.isValidIdentifier(identifier)) {
                 errorTable.addError("Invalid Identifier", identifier, lineNumber, 
@@ -142,7 +138,7 @@ public class SymbolTable extends JTable {
             symbolMap.put(identifier, type);
             model.addRow(new Object[]{identifier, type});
         }
-        
+
         // Add semicolon
         symbolMap.put(";", "Delimiter");
         model.addRow(new Object[]{";", "Delimiter"});
@@ -193,26 +189,7 @@ public class SymbolTable extends JTable {
     }
 
     private boolean isValidValueForType(String type, String value) {
-        switch (type) {
-            case "IntegerType":
-                try {
-                    Integer.parseInt(value);
-                    return true;
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-            case "FloatType":
-                try {
-                    Float.parseFloat(value);
-                    return true;
-                } catch (NumberFormatException e) {
-                    return false;
-                }
-            case "StringType":
-                return value.startsWith("\"") && value.endsWith("\"");
-            default:
-                return false;
-        }
+        return TypeValidator.isValidValueForType(type, value);
     }
 
     public void clearTable() {
