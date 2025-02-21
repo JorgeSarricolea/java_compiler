@@ -15,9 +15,6 @@ public class SymbolTable extends JTable {
     private DefaultTableModel model;
     private HashMap<String, String> symbolMap;
 
-    // Identifier patterns for each type
-    private static final String IDENTIFIER_PATTERN = "JSJ[a-z][0-9]+";
-
     private static final Color DARK_BG = new Color(43, 43, 43);
     private static final Color DARK_TEXT = new Color(169, 183, 198);
     private static final Color DARKER_BG = new Color(30, 30, 30);
@@ -168,7 +165,7 @@ public class SymbolTable extends JTable {
 
         for (String operand : operands) {
             operand = operand.trim();
-            if (operand.matches(IDENTIFIER_PATTERN)) {
+            if (IdentifierValidator.isValidIdentifier(operand)) {
                 // Check if operand is declared
                 if (!symbolMap.containsKey(operand)) {
                     errorTable.addError("Undeclared Variable", operand, lineNumber,
