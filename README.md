@@ -39,19 +39,22 @@ A simple Java compiler implementation that handles lexical analysis, symbol tabl
 
 ```
 └── 📁src
+    └── 📁compiler
+        └── Compiler.java
+        └── MainWindow.java
     └── 📁errors
-        └── ErrorHandler.java         # Centralized error message management
+        └── ErrorHandler.java
+        └── ErrorType.java
     └── 📁tables
-        └── ErrorTable.java          # Semantic error tracking and display
-        └── SymbolTable.java         # Symbol management and type checking
+        └── BaseTable.java
+        └── ErrorTable.java
+        └── SymbolTable.java
     └── 📁theme
-        └── DarkThemeColors.java     # UI theme configuration
+        └── DarkThemeColors.java
+    └── 📁tokens
+        └── TokenType.java
     └── 📁validators
-        └── IdentifierValidator.java  # Variable name validation
-        └── TypeValidator.java       # Data type validation
-        └── Validator.java           # Validation interface
-    └── Compiler.java               # Main compiler implementation
-    └── MainWindow.java             # GUI implementation
+        └── RegExPattern.java
 ```
 
 ## Getting Started
@@ -82,13 +85,13 @@ cd java_compiler
 3. Compile the source files:
 
 ```bash
-javac src/*.java
+javac src/**/*.java
 ```
 
 4. Run the compiler:
 
 ```bash
-java src.Compiler
+java java src.compiler.Compiler
 ```
 
 ## Usage Example

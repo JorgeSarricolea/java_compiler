@@ -1,6 +1,6 @@
 package src.tables;
 
-import src.validators.RegExPattern;   
+import src.validators.RegExPattern;
 import src.tokens.TokenType;
 import src.errors.ErrorType;
 
@@ -19,7 +19,7 @@ public class SymbolTable extends BaseTable {
     protected void initializeColumns() {
         model.addColumn("Lexeme");
         model.addColumn("Type");
-        
+
         // Configure column widths
         getColumnModel().getColumn(0).setPreferredWidth(150);
         getColumnModel().getColumn(1).setPreferredWidth(150);
@@ -39,10 +39,20 @@ public class SymbolTable extends BaseTable {
             declaration = declaration.trim();
             if (declaration.isEmpty()) continue;
 
-            // Check if it's a declaration with initialization (contains type and =)
+            // Get the first word (type)
+            String[] parts = declaration.split("\\s+", 2);
+            if (parts.length < 2) continue;
+
+            String type = parts[0];
+            // Validate the type first
+            if (!isValidType(type)) {
+                errorTable.addError(ErrorType.INVALID_TYPE, type, lineNumber);
+                continue;
+            }
+
+            // Check if it's a declaration with initialization
             if (declaration.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
-                String type = declaration.split("\\s+")[0];
-                String rest = declaration.substring(type.length()).trim();
+                String rest = parts[1].trim();
 
                 // Add type to symbol table
                 TokenType typeToken = TokenType.getType(type);
@@ -64,17 +74,17 @@ public class SymbolTable extends BaseTable {
 
                     // Check if this variable has initialization
                     if (var.contains("=")) {
-                        String[] parts = var.split("=");
-                        String identifier = parts[0].trim();
+                        String[] assignParts = var.split("=");
+                        String identifier = assignParts[0].trim();
 
                         // Check if there's a value after the equals sign
-                        if (parts.length < 2 || parts[1].trim().isEmpty()) {
+                        if (assignParts.length < 2 || assignParts[1].trim().isEmpty()) {
                             errorTable.addError(ErrorType.SYNTAX_ERROR, identifier, lineNumber,
                                 "Missing value after assignment operator");
                             continue;
                         }
 
-                        String value = parts[1].trim();
+                        String value = assignParts[1].trim();
 
                         // Process identifier
                         if (!RegExPattern.isValidIdentifier(identifier)) {
@@ -135,7 +145,7 @@ public class SymbolTable extends BaseTable {
                 symbolMap.put(part, tokenType.toString());
                 model.addRow(new Object[]{part, tokenType});
             } else if (RegExPattern.isValidIdentifier(part)) {
-                // Es un identificador
+                // Is an identifier
                 if (!symbolMap.containsKey(part)) {
                     errorTable.addError(ErrorType.UNDECLARED_VARIABLE, part, lineNumber);
                     return;
@@ -173,5 +183,11 @@ public class SymbolTable extends BaseTable {
      */
     public boolean containsLexeme(String lexeme) {
         return symbolMap.containsKey(lexeme);
+    }
+
+    private boolean isValidType(String type) {
+        return type.equals("IntegerType") || 
+               type.equals("FloatType") || 
+               type.equals("StringType");
     }
 }
