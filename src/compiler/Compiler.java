@@ -1,4 +1,4 @@
-package src;
+package src.compiler;
 
 public class Compiler {
     public static void main(String[] args) {

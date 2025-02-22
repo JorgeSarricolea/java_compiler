@@ -1,4 +1,4 @@
-package src;
+package src.compiler;
 import javax.swing.*;
 
 import src.tables.ErrorTable;
