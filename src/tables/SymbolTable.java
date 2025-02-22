@@ -1,66 +1,34 @@
 package src.tables;
-import javax.swing.*;
-import javax.swing.table.DefaultTableModel;
 
-import src.errors.ErrorHandler;
-import src.validators.IdentifierValidator;
-import src.validators.TypeValidator;
-import src.validators.OperatorValidator;
+import src.validators.RegExPattern;   
+import src.tokens.TokenType;
+import src.errors.ErrorType;
 
-import javax.swing.table.DefaultTableCellRenderer;
-import java.awt.Component;
 import java.util.HashMap;
-import java.awt.Color;
 
-public class SymbolTable extends JTable {
-    private DefaultTableModel model;
+public class SymbolTable extends BaseTable {
     private HashMap<String, String> symbolMap;
 
-    private static final Color DARK_BG = new Color(43, 43, 43);
-    private static final Color DARK_TEXT = new Color(169, 183, 198);
-    private static final Color DARKER_BG = new Color(30, 30, 30);
-    private static final Color SELECTION_BG = new Color(82, 109, 165);
-
     public SymbolTable() {
+        super();
         symbolMap = new HashMap<>();
-        initializeTable();
+        initializeColumns();
     }
 
-    private void initializeTable() {
-        model = new DefaultTableModel();
+    @Override
+    protected void initializeColumns() {
         model.addColumn("Lexeme");
         model.addColumn("Type");
-        setModel(model);
-
-        // Configure table appearance
-        setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+        
+        // Configure column widths
         getColumnModel().getColumn(0).setPreferredWidth(150);
         getColumnModel().getColumn(1).setPreferredWidth(150);
-        setRowHeight(getRowHeight() + 10);
+    }
 
-        setBackground(DARKER_BG);
-        setForeground(DARK_TEXT);
-        getTableHeader().setBackground(DARK_BG);
-        getTableHeader().setForeground(DARK_TEXT);
-        setGridColor(new Color(70, 70, 70));
-        setSelectionBackground(SELECTION_BG);
-        setSelectionForeground(Color.WHITE);
-
-        setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable table, Object value,
-                    boolean isSelected, boolean hasFocus, int row, int column) {
-                Component c = super.getTableCellRendererComponent(table, value, isSelected, hasFocus, row, column);
-                if (!isSelected) {
-                    c.setBackground(DARKER_BG);
-                    c.setForeground(DARK_TEXT);
-                }
-                if (c instanceof JLabel) {
-                    ((JLabel) c).setHorizontalAlignment(JLabel.LEFT);
-                }
-                return c;
-            }
-        });
+    @Override
+    public void clearTable() {
+        super.clearTable();
+        symbolMap.clear();
     }
 
     public void processInput(String input, int lineNumber, ErrorTable errorTable) {
@@ -72,86 +40,85 @@ public class SymbolTable extends JTable {
             if (declaration.isEmpty()) continue;
 
             // Check if it's a declaration with initialization (contains type and =)
-            if (declaration.matches("(IntegerType|FloatType|StringType)\\s+.*=.*")) {
-                String[] parts = declaration.split("=");
-                // Process declaration part
-                processDeclaration(parts[0], lineNumber, errorTable);
-                // Process assignment part
-                if (parts.length > 1) {
-                    String identifier = parts[0].split("\\s+")[1].trim();
-                    processAssignment(identifier + "=" + parts[1], lineNumber, errorTable);
+            if (declaration.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
+                String type = declaration.split("\\s+")[0];
+                String rest = declaration.substring(type.length()).trim();
+
+                // Add type to symbol table
+                TokenType typeToken = TokenType.getType(type);
+                symbolMap.put(type, typeToken.toString());
+                model.addRow(new Object[]{type, typeToken});
+
+                // Split multiple declarations by comma
+                String[] variables = rest.split(",");
+
+                for (int i = 0; i < variables.length; i++) {
+                    String var = variables[i].trim();
+
+                    // Add comma as delimiter if not first variable
+                    if (i > 0) {
+                        TokenType commaType = TokenType.getType(",");
+                        symbolMap.put(",", commaType.toString());
+                        model.addRow(new Object[]{",", commaType});
+                    }
+
+                    // Check if this variable has initialization
+                    if (var.contains("=")) {
+                        String[] parts = var.split("=");
+                        String identifier = parts[0].trim();
+
+                        // Check if there's a value after the equals sign
+                        if (parts.length < 2 || parts[1].trim().isEmpty()) {
+                            errorTable.addError(ErrorType.SYNTAX_ERROR, identifier, lineNumber,
+                                "Missing value after assignment operator");
+                            continue;
+                        }
+
+                        String value = parts[1].trim();
+
+                        // Process identifier
+                        if (!RegExPattern.isValidIdentifier(identifier)) {
+                            errorTable.addError(ErrorType.INVALID_IDENTIFIER, identifier, lineNumber);
+                            continue;
+                        }
+
+                        // Add identifier to symbol table
+                        symbolMap.put(identifier, type);
+                        model.addRow(new Object[]{identifier, type});
+
+                        // Add assignment operator
+                        TokenType assignType = TokenType.getType("=");
+                        symbolMap.put("=", assignType.toString());
+                        model.addRow(new Object[]{"=", assignType});
+
+                        // Add value with the same type as the identifier
+                        if (TokenType.getType(type).isValidValue(value)) {
+                            model.addRow(new Object[]{value, type});
+                        } else {
+                            errorTable.addError(ErrorType.TYPE_MISMATCH, value, lineNumber,
+                                value, type);
+                        }
+                    } else {
+                        // Just a declaration without initialization
+                        if (!RegExPattern.isValidIdentifier(var)) {
+                            errorTable.addError(ErrorType.INVALID_IDENTIFIER, var, lineNumber);
+                            continue;
+                        }
+                        symbolMap.put(var, type);
+                        model.addRow(new Object[]{var, type});
+                    }
                 }
+
+                // Add semicolon
+                TokenType semicolonType = TokenType.getType(";");
+                symbolMap.put(";", semicolonType.toString());
+                model.addRow(new Object[]{";", semicolonType});
             }
-            // Check for regular assignment
+            // Regular assignment
             else if (declaration.contains("=")) {
                 processAssignment(declaration, lineNumber, errorTable);
             }
-            // Regular declaration
-            else {
-                processDeclaration(declaration, lineNumber, errorTable);
-            }
         }
-    }
-
-    private void processDeclaration(String declaration, int lineNumber, ErrorTable errorTable) {
-        String[] parts = declaration.trim().split("\\s+", 2); // Split only first space
-
-        // Check basic format
-        if (parts.length != 2) {
-            errorTable.addError("Syntax Error", declaration, lineNumber,
-                "Invalid declaration format");
-            return;
-        }
-
-        String type = parts[0];
-        String[] identifiers = parts[1].split(",(?=\\s*JSJ)"); // Split by comma but keep it
-
-        // Validate type using TypeValidator
-        if (!TypeValidator.isValidType(type)) {
-            errorTable.addError("Invalid Type", type, lineNumber,
-                ErrorHandler.getErrorMessage("INVALID_TYPE"));
-            return;
-        }
-
-        // Add type to symbol table
-        symbolMap.put(type, "Reserved Word");
-        model.addRow(new Object[]{type, "Reserved Word"});
-
-        // Process each identifier
-        for (int i = 0; i < identifiers.length; i++) {
-            String id = identifiers[i].trim();
-
-            // Add comma from previous identifier if not first
-            if (i > 0) {
-                symbolMap.put(",", "Delimiter");
-                model.addRow(new Object[]{",", "Delimiter"});
-            }
-
-            // Remove trailing comma if present
-            String identifier = id.replace(",", "").trim();
-
-            // Validate identifier using IdentifierValidator
-            if (!IdentifierValidator.isValidIdentifier(identifier)) {
-                errorTable.addError("Invalid Identifier", identifier, lineNumber,
-                    ErrorHandler.getErrorMessage("INVALID_IDENTIFIER"));
-                continue;
-            }
-
-            // Check for duplicate declarations
-            if (symbolMap.containsKey(identifier)) {
-                errorTable.addError("Duplicate Declaration", identifier, lineNumber,
-                    "Variable already declared");
-                continue;
-            }
-
-            // Add identifier to symbol table
-            symbolMap.put(identifier, type);
-            model.addRow(new Object[]{identifier, type});
-        }
-
-        // Add semicolon
-        symbolMap.put(";", "Delimiter");
-        model.addRow(new Object[]{";", "Delimiter"});
     }
 
     private void processAssignment(String assignment, int lineNumber, ErrorTable errorTable) {
@@ -162,25 +129,25 @@ public class SymbolTable extends JTable {
             part = part.trim();
             if (part.isEmpty()) continue;
 
-            if (OperatorValidator.isOperator(part)) {
+            TokenType tokenType = TokenType.getType(part);
+            if (tokenType != null) {
                 // Add operator to symbol table
-                symbolMap.put(part, OperatorValidator.getOperatorType(part));
-                model.addRow(new Object[]{part, OperatorValidator.getOperatorType(part)});
-            } else if (IdentifierValidator.isValidIdentifier(part)) {
+                symbolMap.put(part, tokenType.toString());
+                model.addRow(new Object[]{part, tokenType});
+            } else if (RegExPattern.isValidIdentifier(part)) {
                 // Es un identificador
                 if (!symbolMap.containsKey(part)) {
-                    errorTable.addError("Undeclared Variable", part, lineNumber,
-                        "Variable must be declared before use");
+                    errorTable.addError(ErrorType.UNDECLARED_VARIABLE, part, lineNumber);
                     return;
                 }
                 currentIdentifier = part;
             } else {
                 // Literal value
                 if (currentIdentifier != null) {
-                    String targetType = symbolMap.get(currentIdentifier);
-                    if (!TypeValidator.isValidValueForType(targetType, part)) {
-                        errorTable.addError("Type Mismatch", part, lineNumber,
-                            "Value does not match variable type " + targetType);
+                    TokenType targetType = TokenType.getType(symbolMap.get(currentIdentifier));
+                    if (!targetType.isValidValue(part)) {
+                        errorTable.addError(ErrorType.TYPE_MISMATCH, part, lineNumber,
+                            part, targetType);
                         return;
                     }
                     // Add literal value to symbol table
@@ -188,17 +155,6 @@ public class SymbolTable extends JTable {
                 }
             }
         }
-    }
-
-    private boolean isValidValueForType(String type, String value) {
-        return TypeValidator.isValidValueForType(type, value);
-    }
-
-    public void clearTable() {
-        while (model.getRowCount() > 0) {
-            model.removeRow(0);
-        }
-        symbolMap.clear();
     }
 
     /**
