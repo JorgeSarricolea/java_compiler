@@ -17,11 +17,14 @@ public class TokenType {
     public static final TokenType FLOAT_TYPE = new TokenType("FloatType", Pattern.compile("^-?\\d*\\.?\\d+$"));
     public static final TokenType STRING_TYPE = new TokenType("StringType", Pattern.compile("^\".*\"$"));
 
+    public static final TokenType UNDEFINED = new TokenType("Undefined", null);
+
     private static final HashMap<String, TokenType> SYMBOL_TYPES = new HashMap<String, TokenType>() {{
         // Types (Reserved Words)
         put("IntegerType", INTEGER_TYPE);
         put("FloatType", FLOAT_TYPE);
         put("StringType", STRING_TYPE);
+        put("Undefined", UNDEFINED);
 
         // Delimiters
         put(",", DELIMITER);
