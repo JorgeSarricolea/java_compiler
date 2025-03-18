@@ -15,12 +15,12 @@ public class ErrorType {
         put("SYNTAX_ERROR", "Missing value after assignment operator");
     }};
 
-    public static final ErrorType INVALID_TYPE = new ErrorType("Invalid Type", "INVALID_TYPE");
-    public static final ErrorType INVALID_IDENTIFIER = new ErrorType("Invalid Identifier", "INVALID_IDENTIFIER");
-    public static final ErrorType DUPLICATE_DECLARATION = new ErrorType("Duplicate Declaration", "DUPLICATE_DECLARATION");
-    public static final ErrorType UNDECLARED_VARIABLE = new ErrorType("Undeclared Variable", "UNDECLARED_VARIABLE");
-    public static final ErrorType TYPE_MISMATCH = new ErrorType("Type Mismatch", "TYPE_MISMATCH");
-    public static final ErrorType SYNTAX_ERROR = new ErrorType("Syntax Error", "SYNTAX_ERROR");
+    public static final ErrorType INVALID_TYPE = new ErrorType("Invalid_Type", "INVALID_TYPE");
+    public static final ErrorType INVALID_IDENTIFIER = new ErrorType("Invalid_Identifier", "INVALID_IDENTIFIER");
+    public static final ErrorType DUPLICATE_DECLARATION = new ErrorType("Duplicate_Declaration", "DUPLICATE_DECLARATION");
+    public static final ErrorType UNDECLARED_VARIABLE = new ErrorType("Undeclared_Variable", "UNDECLARED_VARIABLE");
+    public static final ErrorType TYPE_MISMATCH = new ErrorType("Type_Mismatch", "TYPE_MISMATCH");
+    public static final ErrorType SYNTAX_ERROR = new ErrorType("Syntax_Error", "SYNTAX_ERROR");
 
     private ErrorType(String token, String messageKey) {
         this.token = token;
