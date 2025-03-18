@@ -8,6 +8,7 @@ import java.util.ArrayList;
 
 public class ErrorTable extends BaseTable {
     private ArrayList<SemanticError> errors;
+    private int errorCounter = 1; // Contador para tokens únicos
 
     public ErrorTable() {
         super();
@@ -30,21 +31,27 @@ public class ErrorTable extends BaseTable {
     }
 
     @Override
-    public void clearTable() {
-        super.clearTable();
+    protected void clearSpecificData() {
         errors.clear();
+        errorCounter = 1; // Reiniciar el contador al limpiar
     }
 
     public void addError(ErrorType errorType, String lexeme, int line, Object... args) {
-        SemanticError error = new SemanticError(errorType.getToken(), lexeme, line,
+        String uniqueToken = errorType.getToken() + "_" + errorCounter++; // Token único con contador
+        SemanticError error = new SemanticError(uniqueToken, lexeme, line,
             errorType.getMessage(args));
         errors.add(error);
         model.addRow(new Object[]{
-            errorType.getToken(),
+            uniqueToken,
             lexeme,
             line,
             errorType.getMessage(args)
         });
+        
+        // Asegurarse de que el lexema que causó el error esté en la tabla de símbolos
+        if (MainWindow.symbolTable != null) {
+            MainWindow.symbolTable.addLexemeToTable(lexeme, TokenType.UNDEFINED.toString());
+        }
     }
 
     public void checkSemanticError(String input, int line) {
