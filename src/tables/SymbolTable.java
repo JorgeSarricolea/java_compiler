@@ -26,8 +26,7 @@ public class SymbolTable extends BaseTable {
     }
 
     @Override
-    public void clearTable() {
-        super.clearTable();
+    protected void clearSpecificData() {
         symbolMap.clear();
     }
 
@@ -55,7 +54,7 @@ public class SymbolTable extends BaseTable {
             String rest = parts[1].trim();
 
             // Add type to symbol table
-            model.addRow(new Object[]{type, "Reserved Word"});
+            addLexemeToTable(type, "Reserved Word");
 
             // Split multiple declarations by comma
             String[] variables = rest.split(",");
@@ -65,8 +64,7 @@ public class SymbolTable extends BaseTable {
 
                 // Add comma as delimiter if not first variable
                 if (i > 0) {
-                    TokenType commaType = TokenType.getType(",");
-                    model.addRow(new Object[]{",", commaType});
+                    addLexemeToTable(",", TokenType.DELIMITER.toString());
                 }
 
                 // Check if this variable has initialization
@@ -88,7 +86,7 @@ public class SymbolTable extends BaseTable {
 
                     // Add identifier to symbol table with its type
                     symbolMap.put(identifier, type);
-                    model.addRow(new Object[]{identifier, type});
+                    addLexemeToTable(identifier, type);
 
                     // Process initialization
                     if (assignParts.length < 2 || assignParts[1].trim().isEmpty()) {
@@ -99,11 +97,11 @@ public class SymbolTable extends BaseTable {
                     String value = assignParts[1].trim();
 
                     // Add assignment operator
-                    model.addRow(new Object[]{"=", TokenType.ASSIGNMENT_OPERATOR});
+                    addLexemeToTable("=", TokenType.ASSIGNMENT_OPERATOR.toString());
 
                     // Validate and add value
                     if (TokenType.getType(type).isValidValue(value)) {
-                        model.addRow(new Object[]{value, type});
+                        addLexemeToTable(value, type);
                     } else {
                         errorTable.addError(ErrorType.TYPE_MISMATCH, value, lineNumber, value, type);
                     }
@@ -121,12 +119,12 @@ public class SymbolTable extends BaseTable {
                     }
 
                     symbolMap.put(var, type);
-                    model.addRow(new Object[]{var, type});
+                    addLexemeToTable(var, type);
                 }
             }
 
             // Add semicolon
-            model.addRow(new Object[]{";", TokenType.DELIMITER});
+            addLexemeToTable(";", TokenType.DELIMITER.toString());
         }
     }
 
@@ -135,19 +133,67 @@ public class SymbolTable extends BaseTable {
         if (parts.length != 2) return;
 
         String variable = parts[0].trim();
-        String value = parts[1].trim();
+        String expression = parts[1].trim();
 
         // Check if variable exists
         if (!symbolMap.containsKey(variable)) {
             errorTable.addError(ErrorType.UNDECLARED_VARIABLE, variable, lineNumber);
+            addLexemeToTable(variable, TokenType.UNDEFINED.toString());
             return;
         }
 
-        // Get the type of the variable
         String varType = symbolMap.get(variable);
         TokenType targetType = TokenType.getType(varType);
+        addLexemeToTable(variable, varType);
+        addLexemeToTable("=", TokenType.ASSIGNMENT_OPERATOR.toString());
 
-        // If value is an identifier, check its type
+        // Split expression by arithmetic operators
+        String[] operands = expression.split("\\s*[+\\-*/]\\s*");
+        String[] operators = expression.split("[^+\\-*/]+");
+
+        // Procesar operandos
+        for (String operand : operands) {
+            operand = operand.trim();
+            if (!operand.isEmpty()) {
+                if (RegExPattern.isValidIdentifier(operand)) {
+                    if (symbolMap.containsKey(operand)) {
+                        addLexemeToTable(operand, symbolMap.get(operand));
+                    } else {
+                        addLexemeToTable(operand, TokenType.UNDEFINED.toString());
+                    }
+                } else {
+                    // Determinar el tipo del literal
+                    if (TokenType.FLOAT_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.FLOAT_TYPE.toString());
+                    } else if (TokenType.INTEGER_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.INTEGER_TYPE.toString());
+                    } else if (TokenType.STRING_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.STRING_TYPE.toString());
+                    } else {
+                        addLexemeToTable(operand, TokenType.UNDEFINED.toString());
+                    }
+                }
+            }
+        }
+
+        // Procesar operadores
+        for (String operator : operators) {
+            operator = operator.trim();
+            if (!operator.isEmpty()) {
+                addLexemeToTable(operator, TokenType.ARITHMETIC_OPERATOR.toString());
+            }
+        }
+
+        // Validar la expresión
+        if (operands.length == 1) {
+            handleSingleOperand(variable, operands[0], varType, targetType, lineNumber, errorTable);
+        } else {
+            handleArithmeticExpression(variable, operands, varType, lineNumber, errorTable);
+        }
+    }
+
+    private void handleSingleOperand(String variable, String value, String varType, TokenType targetType, 
+                                   int lineNumber, ErrorTable errorTable) {
         if (RegExPattern.isValidIdentifier(value)) {
             if (!symbolMap.containsKey(value)) {
                 errorTable.addError(ErrorType.UNDECLARED_VARIABLE, value, lineNumber);
@@ -155,21 +201,42 @@ public class SymbolTable extends BaseTable {
             }
             String valueType = symbolMap.get(value);
             if (!valueType.equals(varType)) {
-                errorTable.addError(ErrorType.TYPE_MISMATCH, variable, lineNumber, valueType, varType);
+                errorTable.addError(ErrorType.TYPE_MISMATCH, value, lineNumber, valueType, varType);
                 return;
             }
         } else {
-            // Check if literal value matches the variable type
             if (!targetType.isValidValue(value)) {
-                errorTable.addError(ErrorType.TYPE_MISMATCH, variable, lineNumber, value, varType);
+                errorTable.addError(ErrorType.TYPE_MISMATCH, value, lineNumber, value, varType);
                 return;
             }
         }
+    }
 
-        // Add to symbol table display
-        model.addRow(new Object[]{variable, varType});
-        model.addRow(new Object[]{"=", TokenType.ASSIGNMENT_OPERATOR});
-        model.addRow(new Object[]{value, varType});
+    private void handleArithmeticExpression(String variable, String[] operands, String varType, 
+                                          int lineNumber, ErrorTable errorTable) {
+        // Check each operand
+        for (String operand : operands) {
+            operand = operand.trim();
+            if (RegExPattern.isValidIdentifier(operand)) {
+                // Check if operand exists and has compatible type
+                if (!symbolMap.containsKey(operand)) {
+                    errorTable.addError(ErrorType.UNDECLARED_VARIABLE, operand, lineNumber);
+                    return;
+                }
+                String operandType = symbolMap.get(operand);
+                if (!operandType.equals(varType)) {
+                    errorTable.addError(ErrorType.TYPE_MISMATCH, operand, lineNumber, operandType, varType);
+                    return;
+                }
+            } else {
+                // Check if literal value matches the variable type
+                TokenType targetType = TokenType.getType(varType);
+                if (!targetType.isValidValue(operand)) {
+                    errorTable.addError(ErrorType.TYPE_MISMATCH, operand, lineNumber, operand, varType);
+                    return;
+                }
+            }
+        }
     }
 
     /**
