@@ -5,9 +5,11 @@ import javax.swing.table.DefaultTableModel;
 import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.Component;
 import java.awt.Color;
+import java.util.HashMap;
 
 public abstract class BaseTable extends JTable {
     protected DefaultTableModel model;
+    protected HashMap<String, Boolean> lexemeDisplayed;
 
     // Common colors for dark theme
     protected static final Color DARK_BG = new Color(43, 43, 43);
@@ -19,6 +21,7 @@ public abstract class BaseTable extends JTable {
 
     public BaseTable() {
         initializeBaseTable();
+        lexemeDisplayed = new HashMap<>();
     }
 
     protected void initializeBaseTable() {
@@ -56,12 +59,24 @@ public abstract class BaseTable extends JTable {
         });
     }
 
-    public void clearTable() {
+    public final void clearTable() {
         while (model.getRowCount() > 0) {
             model.removeRow(0);
+        }
+        lexemeDisplayed.clear();
+        clearSpecificData();
+    }
+
+    public void addLexemeToTable(String lexeme, String type) {
+        if (!lexemeDisplayed.containsKey(lexeme)) {
+            model.addRow(new Object[]{lexeme, type});
+            lexemeDisplayed.put(lexeme, true);
         }
     }
 
     // Abstract methods that child classes must implement
     protected abstract void initializeColumns();
+
+    // Método abstracto para limpiar datos específicos de cada tabla
+    protected abstract void clearSpecificData();
 }
