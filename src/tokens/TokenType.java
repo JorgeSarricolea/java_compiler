@@ -25,10 +25,21 @@ public class TokenType {
         put("FloatType", FLOAT_TYPE);
         put("StringType", STRING_TYPE);
         put("Undefined", UNDEFINED);
+        
+        // Control structures (Reserved Words)
+        put("while", RESERVED_WORD);
+        put("if", RESERVED_WORD);
+        put("for", RESERVED_WORD);
 
         // Delimiters
         put(",", DELIMITER);
         put(";", DELIMITER);
+        put("{", DELIMITER);
+        put("}", DELIMITER);
+
+        // Logical operators 
+        put("&&", RELATIONAL_OPERATOR);
+        put("||", RELATIONAL_OPERATOR);
 
         // Operators
         put("=", ASSIGNMENT_OPERATOR);
