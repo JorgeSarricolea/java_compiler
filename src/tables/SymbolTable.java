@@ -31,6 +31,29 @@ public class SymbolTable extends BaseTable {
     }
 
     public void processInput(String input, int lineNumber, ErrorTable errorTable) {
+        // Identificar y omitir estructuras de control sin procesarlas como identificadores
+        if (input.startsWith("while") || input.startsWith("if") || input.startsWith("for")) {
+            // Extraer la condición para analizar variables que aparecen en ella
+            String condition = "";
+            int startPos = input.indexOf('(');
+            int endPos = input.lastIndexOf(')');
+            
+            if (startPos >= 0 && endPos > startPos) {
+                condition = input.substring(startPos + 1, endPos);
+                addLexemeToTable("while", TokenType.RESERVED_WORD.toString());
+                
+                // Procesar variables en la condición sin analizarla como asignación
+                processCondition(condition, lineNumber, errorTable);
+            }
+            return;
+        }
+        
+        // Manejo de llaves de bloques
+        if (input.equals("{") || input.equals("}")) {
+            addLexemeToTable(input, TokenType.DELIMITER.toString());
+            return;
+        }
+        
         // Split input by semicolon
         String[] declarations = input.split(";");
 
@@ -234,6 +257,76 @@ public class SymbolTable extends BaseTable {
                 if (!targetType.isValidValue(operand)) {
                     errorTable.addError(ErrorType.TYPE_MISMATCH, operand, lineNumber, operand, varType);
                     return;
+                }
+            }
+        }
+    }
+
+    private void processCondition(String condition, int lineNumber, ErrorTable errorTable) {
+        // Primero dividimos en operadores lógicos (&&, ||)
+        String[] logicalParts;
+        if (condition.contains("&&")) {
+            logicalParts = condition.split("&&");
+            addLexemeToTable("&&", "Logical Operator");
+        } else if (condition.contains("||")) {
+            logicalParts = condition.split("\\|\\|");
+            addLexemeToTable("||", "Logical Operator");
+        } else {
+            logicalParts = new String[]{condition};
+        }
+        
+        // Procesamos cada parte lógica
+        for (String part : logicalParts) {
+            part = part.trim();
+            
+            // Buscar operadores relacionales
+            String operator = null;
+            String[] operands = null;
+            
+            if (part.contains("!=")) {
+                operator = "!=";
+                operands = part.split("!=");
+            } else if (part.contains("==")) {
+                operator = "==";
+                operands = part.split("==");
+            } else if (part.contains("<=")) {
+                operator = "<=";
+                operands = part.split("<=");
+            } else if (part.contains(">=")) {
+                operator = ">=";
+                operands = part.split(">=");
+            } else if (part.contains("<")) {
+                operator = "<";
+                operands = part.split("<");
+            } else if (part.contains(">")) {
+                operator = ">";
+                operands = part.split(">");
+            }
+            
+            // Si encontramos un operador relacional, lo procesamos
+            if (operator != null && operands != null && operands.length == 2) {
+                addLexemeToTable(operator, TokenType.RELATIONAL_OPERATOR.toString());
+                
+                // Procesar los operandos
+                for (String operand : operands) {
+                    operand = operand.trim();
+                    if (operand.isEmpty()) continue;
+                    
+                    if (RegExPattern.isValidIdentifier(operand)) {
+                        // Verificar si la variable existe
+                        if (symbolMap.containsKey(operand)) {
+                            addLexemeToTable(operand, symbolMap.get(operand));
+                        } else {
+                            errorTable.addError(ErrorType.UNDECLARED_VARIABLE, operand, lineNumber);
+                            addLexemeToTable(operand, TokenType.UNDEFINED.toString());
+                        }
+                    } else if (TokenType.INTEGER_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.INTEGER_TYPE.toString());
+                    } else if (TokenType.FLOAT_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.FLOAT_TYPE.toString());
+                    } else if (TokenType.STRING_TYPE.isValidValue(operand)) {
+                        addLexemeToTable(operand, TokenType.STRING_TYPE.toString());
+                    }
                 }
             }
         }

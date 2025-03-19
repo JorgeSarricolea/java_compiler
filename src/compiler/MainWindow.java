@@ -6,6 +6,7 @@ import src.tables.SymbolTable;
 import src.theme.DarkThemeColors;
 
 import java.awt.*;
+import java.io.IOException;
 
 public class MainWindow extends JFrame {
     private JTextArea inputArea;
@@ -117,6 +118,9 @@ public class MainWindow extends JFrame {
                         symbolTable.processInput(line, i + 1, errorTable);
                     }
                 }
+                
+                // Generate and save triplo
+                generateAndSaveTriplo(input);
             } else {
                 JOptionPane.showMessageDialog(this,
                     "Please enter code to analyze",
@@ -130,5 +134,38 @@ public class MainWindow extends JFrame {
             symbolTable.clearTable();
             errorTable.clearTable();
         });
+    }
+
+    private void generateAndSaveTriplo(String code) {
+        try {
+            // Crear un nuevo generador de triplo
+            TripletGenerator triploGenerator = new TripletGenerator();
+            triploGenerator.generateTriplo(code);
+            
+            // Nombre del archivo
+            String filePath = "triplet.txt";
+            
+            // Forzar la eliminación del archivo existente
+            java.io.File file = new java.io.File(filePath);
+            if (file.exists()) {
+                boolean deleted = file.delete();
+                if (!deleted) {
+                    // Si no se puede eliminar, usar
+                }
+            }
+            
+            // Guardar el nuevo triplo
+            triploGenerator.saveToFile(filePath);
+            
+            JOptionPane.showMessageDialog(this,
+                "Triplet generated successfully and saved in: " + filePath,
+                "Success",
+                JOptionPane.INFORMATION_MESSAGE);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(this,
+                "Error saving triplet: " + ex.getMessage(),
+                "Error",
+                JOptionPane.ERROR_MESSAGE);
+        }
     }
 }
