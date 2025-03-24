@@ -119,7 +119,7 @@ public class MainWindow extends JFrame {
                     }
                 }
                 
-                // Generate and save triplo
+                // Generar triplo independientemente de los errores
                 generateAndSaveTriplo(input);
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -138,20 +138,15 @@ public class MainWindow extends JFrame {
 
     private void generateAndSaveTriplo(String code) {
         try {
-            // Crear un nuevo generador de triplo
             TripletGenerator triploGenerator = new TripletGenerator();
             triploGenerator.generateTriplo(code);
             
-            // Nombre del archivo
             String filePath = "triplet.txt";
             
             // Forzar la eliminación del archivo existente
             java.io.File file = new java.io.File(filePath);
             if (file.exists()) {
-                boolean deleted = file.delete();
-                if (!deleted) {
-                    // Si no se puede eliminar, usar
-                }
+                file.delete();
             }
             
             // Guardar el nuevo triplo
