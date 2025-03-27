@@ -129,22 +129,114 @@ public class TripletGenerator {
             return;
         }
         
-        // Expresión aritmética
-        String operator = "";
-        if (expression.contains("+")) operator = "+";
-        else if (expression.contains("-")) operator = "-";
-        else if (expression.contains("*")) operator = "*";
-        else if (expression.contains("/")) operator = "/";
+        // Procesar expresión aritmética con múltiples operadores y respetando jerarquía
+        processArithmeticExpression(target, expression);
+    }
+    
+    /**
+     * Procesa una expresión aritmética respetando la jerarquía de operaciones
+     * @param target Variable objetivo donde se asignará el resultado
+     * @param expression Expresión aritmética a procesar
+     */
+    private void processArithmeticExpression(String target, String expression) {
+        // Primero procesamos multiplicación y división
+        // Buscar términos separados por + o -
+        String[] sumTerms = expression.split("(?=[+-])");
         
-        if (!operator.isEmpty()) {
-            String[] operands = expression.split("\\" + operator);
-            String left = operands[0].trim();
-            String right = operands[1].trim();
+        // Contador para variables temporales
+        int tempVarCount = 1;
+        String[] processedTerms = new String[sumTerms.length];
+        
+        // Procesar cada término (puede contener * o /)
+        for (int i = 0; i < sumTerms.length; i++) {
+            String term = sumTerms[i].trim();
             
-            // Utilizar T1 para operaciones aritméticas
-            triploEntries.add(new TriploEntry("T1", left, "="));
-            triploEntries.add(new TriploEntry("T1", right, operator));
-            triploEntries.add(new TriploEntry(target, "T1", "="));
+            // Si el término comienza con + o -, extraerlo
+            char operator = '+';
+            if (term.startsWith("+") || term.startsWith("-")) {
+                operator = term.charAt(0);
+                term = term.substring(1).trim();
+            }
+            
+            // Verificar si el término contiene multiplicación o división
+            if (term.contains("*") || term.contains("/")) {
+                // Determinar el operador
+                String mulOperator = term.contains("*") ? "*" : "/";
+                String[] factors = term.split("\\" + mulOperator);
+                
+                if (factors.length == 2) {
+                    String left = factors[0].trim();
+                    String right = factors[1].trim();
+                    
+                    // Generar triplo para la multiplicación/división
+                    String resultVar = "T" + tempVarCount++;
+                    triploEntries.add(new TriploEntry(resultVar, left, "="));
+                    triploEntries.add(new TriploEntry(resultVar, right, mulOperator));
+                    
+                    // Guardar la variable temporal como resultado de este término
+                    processedTerms[i] = (operator == '-' ? "-" : "") + resultVar;
+                } else {
+                    // Si no se puede dividir correctamente, usar el término original
+                    processedTerms[i] = (operator == '-' ? "-" : "") + term;
+                }
+            } else {
+                // Término simple, guardar como está
+                processedTerms[i] = (operator == '-' ? "-" : "") + term;
+            }
+        }
+        
+        // Ahora procesamos las sumas y restas
+        if (processedTerms.length == 1) {
+            // Si solo hay un término después de procesar * y /, asignarlo directamente
+            String term = processedTerms[0];
+            if (term.startsWith("-")) {
+                // Manejar el caso de negativo
+                triploEntries.add(new TriploEntry("T" + tempVarCount, "0", "="));
+                triploEntries.add(new TriploEntry("T" + tempVarCount, term.substring(1), "-"));
+                triploEntries.add(new TriploEntry(target, "T" + tempVarCount, "="));
+            } else {
+                // Asignar directamente si no es negativo
+                if (term.startsWith("+")) {
+                    term = term.substring(1);
+                }
+                triploEntries.add(new TriploEntry("T" + tempVarCount, term, "="));
+                triploEntries.add(new TriploEntry(target, "T" + tempVarCount, "="));
+            }
+        } else {
+            // Procesar múltiples términos con sumas y restas
+            String resultVar = "T" + tempVarCount++;
+            
+            // El primer término
+            String firstTerm = processedTerms[0];
+            if (firstTerm.startsWith("-")) {
+                // Si el primer término es negativo, comenzar con 0 y restar
+                triploEntries.add(new TriploEntry(resultVar, "0", "="));
+                triploEntries.add(new TriploEntry(resultVar, firstTerm.substring(1), "-"));
+            } else {
+                // Si es positivo, asignar directamente
+                if (firstTerm.startsWith("+")) {
+                    firstTerm = firstTerm.substring(1);
+                }
+                triploEntries.add(new TriploEntry(resultVar, firstTerm, "="));
+            }
+            
+            // Procesar términos restantes
+            for (int i = 1; i < processedTerms.length; i++) {
+                String term = processedTerms[i];
+                char operator = '+';
+                
+                if (term.startsWith("-")) {
+                    operator = '-';
+                    term = term.substring(1);
+                } else if (term.startsWith("+")) {
+                    term = term.substring(1);
+                }
+                
+                triploEntries.add(new TriploEntry(resultVar, term, String.valueOf(operator)));
+            }
+            
+            // Asignar el resultado final
+            triploEntries.add(new TriploEntry(target, resultVar, "="));
         }
     }
     
