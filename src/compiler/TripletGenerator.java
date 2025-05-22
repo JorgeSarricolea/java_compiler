@@ -76,29 +76,18 @@ public class TripletGenerator {
                     // Añadir JMP para volver a la evaluación de la condición
                     triploEntries.add(new TriploEntry("", "JMP", String.valueOf(conditionStartPos)));
                     
-                    // La posición después del JMP
+                    // La posición después del JMP será el final del bloque
                     int afterJmpPos = triploEntries.size() + 1;
                     
                     // Crear una lista temporal para guardar los saltos de bloques externos
                     Stack<Integer> outerJumps = new Stack<>();
                     
-                    // Actualizar solo los saltos del bloque actual (máximo 2 por bloque de while)
-                    int updatedJumps = 0;
-                    while (!pendingJumps.isEmpty() && updatedJumps < 2) {
+                    // Actualizar todos los saltos pendientes del bloque actual para que apunten al final
+                    while (!pendingJumps.isEmpty()) {
                         int pendingJumpPos = pendingJumps.pop();
                         TriploEntry entry = triploEntries.get(pendingJumpPos - 1);
+                        // Los saltos en falso deben apuntar después del JMP
                         entry.operador = String.valueOf(afterJmpPos);
-                        updatedJumps++;
-                    }
-                    
-                    // Mantener cualquier salto pendiente que no sea de este bloque
-                    while (!pendingJumps.isEmpty()) {
-                        outerJumps.push(pendingJumps.pop());
-                    }
-                    
-                    // Restaurar los saltos de bloques externos
-                    while (!outerJumps.isEmpty()) {
-                        pendingJumps.push(outerJumps.pop());
                     }
                 }
             }
@@ -338,14 +327,11 @@ public class TripletGenerator {
         triploEntries.add(new TriploEntry("T2", "T1", operator));
         
         // Si la primera condición es verdadera, saltamos al cuerpo
-        // Guardamos esta posición para actualizar después
-        int bodyStartPos = -1; // Se calculará más adelante
-        int trueJumpPos = triploEntries.size() + 1;
-        triploEntries.add(new TriploEntry("TR1", "true", "?")); // Se actualizará después
+        int bodyStartPos = triploEntries.size() + 8; // Posición donde comenzará el cuerpo
+        triploEntries.add(new TriploEntry("TR1", "true", String.valueOf(bodyStartPos)));
         
         // Si es falsa, verificamos la segunda condición
-        int falseJumpPos = triploEntries.size() + 1;
-        triploEntries.add(new TriploEntry("TR1", "false", String.valueOf(falseJumpPos + 1)));
+        triploEntries.add(new TriploEntry("TR1", "false", String.valueOf(triploEntries.size() + 2)));
         
         // Evaluar segunda condición
         String secondCondition = conditions[1].trim();
@@ -375,20 +361,14 @@ public class TripletGenerator {
             triploEntries.add(new TriploEntry("T4", left, "="));
             triploEntries.add(new TriploEntry("T4", "T3", operator));
             
-            // La posición donde comienza el cuerpo del bloque
-            bodyStartPos = triploEntries.size() + 3;
-            
-            // Actualizar el salto verdadero de la primera condición
-            TriploEntry trueJumpEntry = triploEntries.get(trueJumpPos - 1);
-            trueJumpEntry.operador = String.valueOf(bodyStartPos);
-            
             // Añadir saltos para la segunda condición
             triploEntries.add(new TriploEntry("TR1", "true", String.valueOf(bodyStartPos)));
             
             // Si la segunda condición también es falsa, saltar fuera del bloque
-            int secondFalseJumpPos = triploEntries.size() + 1;
-            triploEntries.add(new TriploEntry("TR1", "false", "?"));
-            pendingJumps.push(secondFalseJumpPos);
+            // Guardamos la posición para actualizar cuando se cierre el bloque
+            int falseJumpPos = triploEntries.size() + 1;
+            triploEntries.add(new TriploEntry("TR1", "false", String.valueOf(falseJumpPos + 1)));
+            pendingJumps.push(falseJumpPos);
         }
     }
     
@@ -429,7 +409,7 @@ public class TripletGenerator {
         // If the first condition is false, skip the entire block
         int falseJumpOutPos = triploEntries.size() + 1;
         triploEntries.add(new TriploEntry("TR1", "true", String.valueOf(falseJumpOutPos + 2)));
-        triploEntries.add(new TriploEntry("TR1", "false", "?")); // Will update when block closes
+        triploEntries.add(new TriploEntry("TR1", "false", "?")); // Se actualizará cuando se cierre el bloque
         pendingJumps.push(falseJumpOutPos + 1);
         
         // Evaluar segunda condición
@@ -470,7 +450,7 @@ public class TripletGenerator {
             
             // Si la segunda condición es falsa, saltar fuera del bloque
             secondFalseJumpPos = triploEntries.size() + 1;
-            triploEntries.add(new TriploEntry("TR1", "false", "?"));
+            triploEntries.add(new TriploEntry("TR1", "false", "?")); // Se actualizará cuando se cierre el bloque
             pendingJumps.push(secondFalseJumpPos);
         }
         
@@ -603,7 +583,7 @@ public class TripletGenerator {
         if (isFirstOrPart) {
             // Si es la primera parte del OR y es verdadera, saltar al cuerpo
             int trueJumpPos = triploEntries.size() + 1;
-            triploEntries.add(new TriploEntry(resultVar, "true", "?")); // Se actualizará después
+            triploEntries.add(new TriploEntry(resultVar, "true", String.valueOf(nextPos + 1))); // Actualizado para saltar correctamente
             
             // Si es falsa, evaluar siguiente condición
             triploEntries.add(new TriploEntry(resultVar, "false", String.valueOf(nextPos)));
