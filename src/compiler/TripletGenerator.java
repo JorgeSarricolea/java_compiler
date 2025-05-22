@@ -79,11 +79,26 @@ public class TripletGenerator {
                     // La posición después del JMP
                     int afterJmpPos = triploEntries.size() + 1;
                     
-                    // Actualizar todos los saltos pendientes para que apunten a esta posición
-                    while (!pendingJumps.isEmpty()) {
+                    // Crear una lista temporal para guardar los saltos de bloques externos
+                    Stack<Integer> outerJumps = new Stack<>();
+                    
+                    // Actualizar solo los saltos del bloque actual (máximo 2 por bloque de while)
+                    int updatedJumps = 0;
+                    while (!pendingJumps.isEmpty() && updatedJumps < 2) {
                         int pendingJumpPos = pendingJumps.pop();
                         TriploEntry entry = triploEntries.get(pendingJumpPos - 1);
                         entry.operador = String.valueOf(afterJmpPos);
+                        updatedJumps++;
+                    }
+                    
+                    // Mantener cualquier salto pendiente que no sea de este bloque
+                    while (!pendingJumps.isEmpty()) {
+                        outerJumps.push(pendingJumps.pop());
+                    }
+                    
+                    // Restaurar los saltos de bloques externos
+                    while (!outerJumps.isEmpty()) {
+                        pendingJumps.push(outerJumps.pop());
                     }
                 }
             }
@@ -129,7 +144,7 @@ public class TripletGenerator {
             return;
         }
         
-        // Procesar expresión aritmética con múltiples operadores y respetando jerarquía
+        // Procesar expresión aritmética respetando la jerarquía de operaciones
         processArithmeticExpression(target, expression);
     }
     
@@ -378,9 +393,9 @@ public class TripletGenerator {
     }
     
     private void processAndConditions(String[] conditions) {
-        // Para AND: ambas condiciones deben ser verdaderas
+        // For AND: both conditions must be true to execute the body
         
-        // Procesar primera condición
+        // Process first condition
         String firstCondition = conditions[0].trim();
         
         // Analizar el tipo de operador
@@ -411,10 +426,10 @@ public class TripletGenerator {
         triploEntries.add(new TriploEntry("T2", left, "="));
         triploEntries.add(new TriploEntry("T2", "T1", operator));
         
-        // Si la primera condición es falsa, saltar fuera del bloque
+        // If the first condition is false, skip the entire block
         int falseJumpOutPos = triploEntries.size() + 1;
         triploEntries.add(new TriploEntry("TR1", "true", String.valueOf(falseJumpOutPos + 2)));
-        triploEntries.add(new TriploEntry("TR1", "false", "?")); // Se actualizará cuando cerremos el bloque
+        triploEntries.add(new TriploEntry("TR1", "false", "?")); // Will update when block closes
         pendingJumps.push(falseJumpOutPos + 1);
         
         // Evaluar segunda condición
@@ -437,6 +452,8 @@ public class TripletGenerator {
             operands = secondCondition.split("==");
         }
         
+        int secondFalseJumpPos = -1;
+        
         if (!operator.isEmpty() && operands != null && operands.length == 2) {
             left = operands[0].trim();
             right = operands[1].trim();
@@ -452,9 +469,27 @@ public class TripletGenerator {
             triploEntries.add(new TriploEntry("TR1", "true", String.valueOf(bodyStartPos)));
             
             // Si la segunda condición es falsa, saltar fuera del bloque
-            int secondFalseJumpPos = triploEntries.size() + 1;
+            secondFalseJumpPos = triploEntries.size() + 1;
             triploEntries.add(new TriploEntry("TR1", "false", "?"));
             pendingJumps.push(secondFalseJumpPos);
+        }
+        
+        // IMPORTANT: Put this jump at the front of the stack so it's processed last
+        // This ensures the false jump from the outer AND condition is processed correctly
+        if (secondFalseJumpPos > 0) {
+            // Move this jump to the front of the pendingJumps stack
+            Stack<Integer> tempStack = new Stack<>();
+            tempStack.push(secondFalseJumpPos);
+            
+            // Copy all other pending jumps
+            while (!pendingJumps.isEmpty()) {
+                tempStack.push(pendingJumps.pop());
+            }
+            
+            // Restore in correct order
+            while (!tempStack.isEmpty()) {
+                pendingJumps.push(tempStack.pop());
+            }
         }
     }
     
@@ -463,43 +498,52 @@ public class TripletGenerator {
     }
     
     private void processMixedConditions(String condition) {
-        // Primero procesamos basándonos en la precedencia de OR (dividiéndolo primero)
+        // For complex conditions, we need to handle multiple jumps correctly
+        // First, handle OR conditions which have lower precedence
+
+        // In a mixed condition like "A > 5 || A < 15 && A < 1"
+        // We should first evaluate "A < 15 && A < 1" as a unit, then OR it with "A > 5"
         String[] orParts = condition.split("\\|\\|");
         
-        // Evaluar la primera parte (puede contener AND)
+        // Process first OR part (left side of ||)
         String firstPart = orParts[0].trim();
-        int firstPartJumpPos = -1;
         
-        if (firstPart.contains("&&")) {
-            // Si contiene AND, procesar como condición compuesta AND
-            String[] andParts = firstPart.split("&&");
-            // Guardar la posición para salto si es verdadero
-            firstPartJumpPos = processAndSubcondition(andParts);
-        } else {
-            // Si es simple, procesar como condición simple
-            firstPartJumpPos = processConditionPart(firstPart, true, false);
-        }
-        
-        // Posición para actualizar posteriormente
+        // Variables for tracking jump positions
+        int firstPartTrueJumpPos = -1;
         int bodyStartPos = -1;
         
-        // Procesar la segunda parte (puede contener AND)
+        // Process first condition (simple condition)
+        if (!firstPart.contains("&&")) {
+            firstPartTrueJumpPos = processConditionPart(firstPart, true, false);
+        } else {
+            String[] andParts = firstPart.split("&&");
+            firstPartTrueJumpPos = processAndSubcondition(andParts);
+        }
+        
+        // Process second OR part (right side of ||)
         String secondPart = orParts[1].trim();
         
+        // If the second part contains AND, process it as a compound condition
         if (secondPart.contains("&&")) {
-            // Si contiene AND, procesar como condición compuesta AND
             String[] andParts = secondPart.split("&&");
+            // The body start position will be after all condition evaluations
             bodyStartPos = processAndSubcondition(andParts);
         } else {
-            // Si es simple, procesar como condición simple
+            // Process as simple condition
             bodyStartPos = processConditionPart(secondPart, false, true);
         }
         
-        // Actualizar el salto de la primera parte si es verdadera
-        if (firstPartJumpPos > 0) {
-            TriploEntry entry = triploEntries.get(firstPartJumpPos - 1);
+        // Make sure we have valid jump positions
+        if (firstPartTrueJumpPos > 0) {
+            // If first part is true, jump to body
+            TriploEntry entry = triploEntries.get(firstPartTrueJumpPos - 1);
             entry.operador = String.valueOf(bodyStartPos);
         }
+        
+        // Keep track of the last pending jump which should jump outside the block
+        // when ALL conditions are false
+        int lastFalseJumpPos = pendingJumps.peek();
+        pendingJumps.push(lastFalseJumpPos);
     }
     
     private int processAndSubcondition(String[] conditions) {
