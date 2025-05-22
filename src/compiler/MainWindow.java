@@ -119,8 +119,8 @@ public class MainWindow extends JFrame {
                     }
                 }
                 
-                // Generar triplo independientemente de los errores
-                generateAndSaveTriplo(input);
+                // Generate both original and optimized triplets
+                generateTriplets(input);
             } else {
                 JOptionPane.showMessageDialog(this,
                     "Please enter code to analyze",
@@ -136,29 +136,35 @@ public class MainWindow extends JFrame {
         });
     }
 
-    private void generateAndSaveTriplo(String code) {
+    private void generateTriplets(String code) {
         try {
+            // Generate original triplet
+            String originalFilePath = "original_triplet.txt";
             TripletGenerator triploGenerator = new TripletGenerator();
             triploGenerator.generateTriplo(code);
             
-            String filePath = "triplet.txt";
-            
             // Forzar la eliminación del archivo existente
-            java.io.File file = new java.io.File(filePath);
+            java.io.File file = new java.io.File(originalFilePath);
             if (file.exists()) {
                 file.delete();
             }
             
-            // Guardar el nuevo triplo
-            triploGenerator.saveToFile(filePath);
+            // Guardar el triplo original
+            triploGenerator.saveToFile(originalFilePath);
+            
+            // Generate optimized triplet
+            String optimizedFilePath = "optimized_triplet.txt";
+            TripletOptimizer.optimizeTriplet(originalFilePath, optimizedFilePath);
             
             JOptionPane.showMessageDialog(this,
-                "Triplet generated successfully and saved in: " + filePath,
+                "Compilation successful!\n\n" +
+                "Original triplet saved to: " + originalFilePath + "\n" +
+                "Optimized triplet saved to: " + optimizedFilePath,
                 "Success",
                 JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
-                "Error saving triplet: " + ex.getMessage(),
+                "Error generating triplets: " + ex.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE);
         }
