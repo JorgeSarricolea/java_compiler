@@ -83,16 +83,11 @@ git clone https://github.com/JorgeSarricolea/java_compiler
 cd java_compiler
 ```
 
-3. Compile the source files:
+3. Compile and run:
 
 ```bash
-javac src/**/*.java
-```
+javac src/**/*.java && java src.compiler.Compiler
 
-4. Run the compiler:
-
-```bash
-java src.compiler.Compiler
 ```
 
 ## Usage Example (Just Compile)
