@@ -621,12 +621,12 @@ public class TripletGenerator {
      */
     public void saveToFile(String filePath) throws IOException {
         try (FileWriter writer = new FileWriter(filePath)) {
-            writer.write("Line  Data Object     Data Source     Operator  \n");
-            writer.write("--------------------------------------------------\n");
+            writer.write("| Line | Data Object | Data Source | Operator |\n");
+            writer.write("|------|-------------|-------------|----------|\n");
             
             int rowNumber = 1;
             for (TriploEntry entry : triploEntries) {
-                writer.write(String.format("%-8d %-15s %-15s %-10s\n", 
+                writer.write(String.format("| %-4d | %-11s | %-11s | %-8s |\n", 
                     rowNumber++, 
                     entry.datoObjeto, 
                     entry.datoFuente, 
@@ -641,12 +641,12 @@ public class TripletGenerator {
      */
     public String getTriploAsString() {
         StringBuilder sb = new StringBuilder();
-        sb.append("Renglón  Dato Objeto     Dato Fuente     Operador  \n");
-        sb.append("--------------------------------------------------\n");
+        sb.append("| Line | Data Object | Data Source | Operator |\n");
+        sb.append("|------|-------------|-------------|----------|\n");
         
         int rowNumber = 1;
         for (TriploEntry entry : triploEntries) {
-            sb.append(String.format("%-8d %-15s %-15s %-10s\n", 
+            sb.append(String.format("| %-4d | %-11s | %-11s | %-8s |\n", 
                 rowNumber++, 
                 entry.datoObjeto, 
                 entry.datoFuente, 
