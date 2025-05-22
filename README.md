@@ -92,7 +92,7 @@ javac src/**/*.java
 4. Run the compiler:
 
 ```bash
-java java src.compiler.Compiler
+java src.compiler.Compiler
 ```
 
 ## Usage Example (Just Compile)
