@@ -40,10 +40,23 @@ public class SymbolTable extends BaseTable {
             
             if (startPos >= 0 && endPos > startPos) {
                 condition = input.substring(startPos + 1, endPos);
-                addLexemeToTable("while", TokenType.RESERVED_WORD.toString());
+                
+                // Agregar la palabra reservada a la tabla de símbolos
+                if (input.startsWith("while")) {
+                    addLexemeToTable("while", TokenType.RESERVED_WORD.toString());
+                } else if (input.startsWith("if")) {
+                    addLexemeToTable("if", TokenType.RESERVED_WORD.toString());
+                } else if (input.startsWith("for")) {
+                    addLexemeToTable("for", TokenType.RESERVED_WORD.toString());
+                }
                 
                 // Procesar variables en la condición sin analizarla como asignación
                 processCondition(condition, lineNumber, errorTable);
+                
+                // Buscar llave de apertura al final de la línea y agregarla si existe
+                if (input.trim().endsWith("{")) {
+                    addLexemeToTable("{", TokenType.DELIMITER.toString());
+                }
             }
             return;
         }
@@ -263,6 +276,9 @@ public class SymbolTable extends BaseTable {
     }
 
     private void processCondition(String condition, int lineNumber, ErrorTable errorTable) {
+        // Agregar paréntesis de apertura y cierre a la tabla de símbolos
+        addLexemeToTable("(", TokenType.DELIMITER.toString());
+        
         // Primero dividimos en operadores lógicos (&&, ||)
         String[] logicalParts;
         if (condition.contains("&&")) {
@@ -330,6 +346,9 @@ public class SymbolTable extends BaseTable {
                 }
             }
         }
+        
+        // Agregar paréntesis de cierre a la tabla de símbolos
+        addLexemeToTable(")", TokenType.DELIMITER.toString());
     }
 
     /**
