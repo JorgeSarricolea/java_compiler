@@ -169,6 +169,36 @@ while (JSJa1 < 20 && JSJa1 != 15) {
 | 16   |             | JMP         | 3        |
 | 17   |             | end         |          |
 
+#### Generated Assembly:
+
+```asm
+        ; Inicialización de JSJa1
+        MOV AX, 10
+        MOV [JSJa1], AX
+
+START0:
+        MOV AX, [JSJa1]
+        MOV BX, 20
+        CMP AX, BX
+        JGE END2          ; Si JSJa1 >= 20, salir
+
+        MOV AX, [JSJa1]
+        MOV BX, 15
+        CMP AX, BX
+        JE END2           ; Si JSJa1 == 15, salir
+
+BODY1:
+        MOV AX, [JSJa1]
+        MOV BX, 1
+        ADD AX, BX
+        MOV [JSJa1], AX
+
+        JMP START0
+
+END2:
+        ; Fin del programa
+```
+
 ### While Loop with OR operator
 
 ```java
@@ -227,8 +257,8 @@ while (JSJa1 > 5 || JSJa1 < 15 && JSJa1 < 1) {
 | 8    | T3          | 15          | =        |
 | 9    | T4          | JSJa1       | =        |
 | 10   | T4          | T3          | <        |
-| 11   | TR2         | true        | 13       |
-| 12   | TR2         | false       | 22       |
+| 11   | TR1         | true        | 13       |
+| 12   | TR1         | false       | 22       |
 | 13   | T5          | 1           | =        |
 | 14   | T6          | JSJa1       | =        |
 | 15   | T6          | T5          | <        |
