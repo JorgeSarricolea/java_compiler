@@ -648,17 +648,22 @@ public class TripletGenerator {
         // Guardar el código original y optimizado en un archivo separado
         try (FileWriter writer = new FileWriter("codebase_optimization.txt")) {
             // Guardar el código original
-            writer.write("=== CÓDIGO ORIGINAL ===\n");
+            writer.write("--------- Original Code ---------\n");
             writer.write(originalCode);
             
             // Guardar el código optimizado
-            writer.write("\n\n=== CÓDIGO OPTIMIZADO ===\n");
+            writer.write("\n\n--------- Optimized Code ---------\n");
             for (String line : optimizedCode) {
                 // Eliminar punto y coma extra al final de la línea
                 line = line.replaceAll(";+$", ";");
                 writer.write(line + "\n");
             }
         }
+        
+        // Generar y guardar el código en ensamblador
+        AssemblyGenerator assemblyGen = new AssemblyGenerator();
+        assemblyGen.generateAssembly(optimizedCode);
+        assemblyGen.saveToFile("assembly.txt");
     }
     
     /**
