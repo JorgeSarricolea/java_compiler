@@ -119,7 +119,7 @@ public class MainWindow extends JFrame {
                     }
                 }
                 
-                // Generate both original and optimized triplets
+                // Generate original triplet
                 generateTriplets(input);
             } else {
                 JOptionPane.showMessageDialog(this,
@@ -139,7 +139,7 @@ public class MainWindow extends JFrame {
     private void generateTriplets(String code) {
         try {
             // Generate original triplet
-            String originalFilePath = "original_triplet.txt";
+            String originalFilePath = "triplet.txt";
             TripletGenerator triploGenerator = new TripletGenerator();
             triploGenerator.generateTriplo(code);
             
@@ -152,14 +152,9 @@ public class MainWindow extends JFrame {
             // Guardar el triplo original
             triploGenerator.saveToFile(originalFilePath);
             
-            // Generate optimized triplet
-            String optimizedFilePath = "optimized_triplet.txt";
-            TripletOptimizer.optimizeTriplet(originalFilePath, optimizedFilePath);
-            
             JOptionPane.showMessageDialog(this,
                 "Compilation successful!\n\n" +
-                "Original triplet saved to: " + originalFilePath + "\n" +
-                "Optimized triplet saved to: " + optimizedFilePath,
+                "Triplet saved to: " + originalFilePath,
                 "Success",
                 JOptionPane.INFORMATION_MESSAGE);
         } catch (IOException ex) {
