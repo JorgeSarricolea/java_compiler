@@ -140,6 +140,7 @@ public class MainWindow extends JFrame {
         try {
             // Generate original triplet
             String originalFilePath = "triplet.txt";
+            String optimizationFilePath = "codebase_optimization.txt";
             TripletGenerator triploGenerator = new TripletGenerator();
             triploGenerator.generateTriplo(code);
             
@@ -152,14 +153,29 @@ public class MainWindow extends JFrame {
             // Guardar el triplo original
             triploGenerator.saveToFile(originalFilePath);
             
-            JOptionPane.showMessageDialog(this,
-                "Compilation successful!\n\n" +
-                "Triplet saved to: " + originalFilePath,
-                "Success",
-                JOptionPane.INFORMATION_MESSAGE);
+            // Crear un JLabel personalizado con texto blanco
+            JLabel messageLabel = new JLabel(
+                "<html><body style='color: white;'>" +
+                "Files generated:<br>" +
+                "-Triplet: " + originalFilePath + "<br>" +
+                "-Optimization: " + optimizationFilePath +
+                "</body></html>"
+            );
+            
+            // Crear un JOptionPane personalizado
+            JOptionPane optionPane = new JOptionPane(
+                messageLabel,
+                JOptionPane.INFORMATION_MESSAGE
+            );
+            optionPane.setPreferredSize(new Dimension(400, 200));
+            
+            // Crear y mostrar el diálogo
+            JDialog dialog = optionPane.createDialog(this, "Success");
+            dialog.setSize(400, 200);
+            dialog.setVisible(true);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(this,
-                "Error generating triplets: " + ex.getMessage(),
+                "Error: " + ex.getMessage(),
                 "Error",
                 JOptionPane.ERROR_MESSAGE);
         }
