@@ -12,11 +12,16 @@ public class TripletGenerator {
     private List<TriploEntry> triploEntries;
     private Stack<Integer> conditionPositions; // Para almacenar posiciones de inicio de condición
     private Stack<Integer> pendingJumps;      // Para almacenar posiciones de saltos que necesitan actualizarse
+    private Optimizer optimizer;
+    private String originalCode;
+    private List<String> optimizedCode;
 
     public TripletGenerator() {
         this.triploEntries = new ArrayList<>();
         this.conditionPositions = new Stack<>();
         this.pendingJumps = new Stack<>();
+        this.optimizer = new Optimizer();
+        this.optimizedCode = new ArrayList<>();
     }
 
     /**
@@ -24,16 +29,21 @@ public class TripletGenerator {
      * @param code Código fuente a procesar
      */
     public void generateTriplo(String code) {
+        // Guardar el código original
+        this.originalCode = code;
+        
         // Reiniciar variables
         triploEntries.clear();
         conditionPositions.clear();
         pendingJumps.clear();
+        optimizedCode.clear();
+        
+        // Optimizar el código antes de generar el triplo
+        optimizedCode = optimizer.optimize(code);
         
         // Analizar el código línea por línea
-        String[] lines = code.split("\n");
-        
-        for (int i = 0; i < lines.length; i++) {
-            String line = lines[i].trim();
+        for (int i = 0; i < optimizedCode.size(); i++) {
+            String line = optimizedCode.get(i).trim();
             if (line.isEmpty()) continue;
             
             // Omitir las declaraciones de variables sin inicialización
@@ -615,12 +625,13 @@ public class TripletGenerator {
     }
     
     /**
-     * Genera un archivo de texto con el triplo generado
-     * @param filePath Ruta del archivo a generar
+     * Genera un archivo de texto con el código original, optimizado y el triplo generado
+     * @param tripletFilePath Ruta del archivo para el triplo
      * @throws IOException Si hay un error al escribir el archivo
      */
-    public void saveToFile(String filePath) throws IOException {
-        try (FileWriter writer = new FileWriter(filePath)) {
+    public void saveToFile(String tripletFilePath) throws IOException {
+        // Guardar el triplo en su archivo
+        try (FileWriter writer = new FileWriter(tripletFilePath)) {
             writer.write("| Line | Data Object | Data Source | Operator |\n");
             writer.write("|------|-------------|-------------|----------|\n");
             
@@ -631,6 +642,21 @@ public class TripletGenerator {
                     entry.datoObjeto, 
                     entry.datoFuente, 
                     entry.operador));
+            }
+        }
+        
+        // Guardar el código original y optimizado en un archivo separado
+        try (FileWriter writer = new FileWriter("codebase_optimization.txt")) {
+            // Guardar el código original
+            writer.write("=== CÓDIGO ORIGINAL ===\n");
+            writer.write(originalCode);
+            
+            // Guardar el código optimizado
+            writer.write("\n\n=== CÓDIGO OPTIMIZADO ===\n");
+            for (String line : optimizedCode) {
+                // Eliminar punto y coma extra al final de la línea
+                line = line.replaceAll(";+$", ";");
+                writer.write(line + "\n");
             }
         }
     }
