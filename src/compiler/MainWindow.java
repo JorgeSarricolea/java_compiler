@@ -141,6 +141,7 @@ public class MainWindow extends JFrame {
             // Generate original triplet
             String originalFilePath = "triplet.txt";
             String optimizationFilePath = "codebase_optimization.txt";
+            String assemblyFilePath = "assembly.txt";
             TripletGenerator triploGenerator = new TripletGenerator();
             triploGenerator.generateTriplo(code);
             
@@ -158,7 +159,8 @@ public class MainWindow extends JFrame {
                 "<html><body style='color: white;'>" +
                 "Files generated:<br>" +
                 "-Triplet: " + originalFilePath + "<br>" +
-                "-Optimization: " + optimizationFilePath +
+                "-Optimization: " + optimizationFilePath + "<br>" +
+                "-Assembly: " + assemblyFilePath +
                 "</body></html>"
             );
             
