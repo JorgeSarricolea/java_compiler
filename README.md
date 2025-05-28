@@ -290,6 +290,68 @@ while (JSJa1 > 5 || JSJa1 < 15 && JSJa1 < 1) {
 | 30   |             | JMP         | 3        |
 | 31   |             | end         |          |
 
+### Optimized While Loop with Multiple Conditions
+
+Original code
+
+```java
+IntegerType JSJa1;
+IntegerType JSJb1;
+IntegerType JSJc1;
+IntegerType JSJy1;
+
+JSJa1 = 10;
+JSJb1 = 20;
+JSJc1 = 15;
+JSJy1 = 10;
+
+while (JSJa1 < JSJb1 && JSJa1 != JSJc1) {
+    JSJa1 = JSJa1 + 1;
+}
+```
+
+Optimized code
+
+```java
+IntegerType JSJa1;
+IntegerType JSJb1;
+IntegerType JSJc1;
+
+JSJa1 = 10;
+JSJb1 = 20;
+JSJc1 = 15;
+
+while (JSJa1 < JSJb1 && JSJa1 != JSJc1) {
+    JSJa1 = JSJa1 + 1;
+}
+```
+
+#### Generated triplet:
+
+| Line | Data Object | Data Source | Operator |
+| ---- | ----------- | ----------- | -------- |
+| 1    | T1          | 10          | =        |
+| 2    | JSJa1       | T1          | =        |
+| 3    | T1          | 20          | =        |
+| 4    | JSJb1       | T1          | =        |
+| 5    | T1          | 15          | =        |
+| 6    | JSJc1       | T1          | =        |
+| 7    | T1          | JSJb1       | =        |
+| 8    | T2          | JSJa1       | =        |
+| 9    | T2          | T1          | <        |
+| 10   | TR1         | true        | 12       |
+| 11   | TR1         | false       | 21       |
+| 12   | T3          | JSJc1       | =        |
+| 13   | T4          | JSJa1       | =        |
+| 14   | T4          | T3          | !=       |
+| 15   | TR1         | true        | 17       |
+| 16   | TR1         | false       | 21       |
+| 17   | T1          | JSJa1       | =        |
+| 18   | T1          | 1           | +        |
+| 19   | JSJa1       | T1          | =        |
+| 20   |             | JMP         | 7        |
+| 21   |             | end         |          |
+
 ## Code Style
 
 - Variables must follow the pattern: JSJ[a-z][0-9]+
