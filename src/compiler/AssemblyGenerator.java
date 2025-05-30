@@ -66,18 +66,18 @@ public class AssemblyGenerator {
             String[] operations = value.split(" ");
             for (String operation : operations) {
                 if (operation.matches("\\d+")) {
-                    assemblyCode.add("        MOV BX, " + operation);
+                    assemblyCode.add("        MOV AL, " + operation);
                 } else if (operation.matches("\\w+")) {
-                    assemblyCode.add("        MOV BX, " + operation);
+                    assemblyCode.add("        MOV BL, " + operation);
                 } else if (operation.equals("*")) {
-                    assemblyCode.add("        MUL BX");
+                    assemblyCode.add("        MUL BL");
                 } else if (operation.equals("-")) {
-                    assemblyCode.add("        SUB AX, BX");
+                    assemblyCode.add("        SUB AX, 1");
                 } else if (operation.equals("+")) {
-                    assemblyCode.add("        ADD AX, BX");
+                    assemblyCode.add("        ADD BX, AX");
                 }
             }
-            assemblyCode.add("        MOV " + target + ", AX");
+            assemblyCode.add("        MOV " + target + ", BX");
         }
     }
     
