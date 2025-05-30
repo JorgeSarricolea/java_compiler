@@ -20,36 +20,29 @@ public class AssemblyGenerator {
         assemblyCode.clear();
         labelCounter = 0;
         
-        // Primero, identificar todas las variables declaradas
+        // Initialize variables directly
         for (String line : optimizedCode) {
             if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
                 String varName = extractVariableName(line);
-                // Inicializar la variable con un valor por defecto
-                assemblyCode.add("        ; Inicialización de " + varName);
                 assemblyCode.add("        MOV AX, 0");
-                assemblyCode.add("        MOV [" + varName + "], AX");
+                assemblyCode.add("        MOV " + varName + ", AX");
             }
         }
         
-        // Luego procesar el resto del código
         for (int i = 0; i < optimizedCode.size(); i++) {
             String line = optimizedCode.get(i).trim();
             if (line.isEmpty()) continue;
             
-            // Procesar declaraciones de variables
             if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
-                continue; // Ya procesamos las declaraciones arriba
+                continue;
             }
             
-            // Procesar asignaciones
             if (line.contains("=")) {
                 processAssignment(line);
             }
             
-            // Procesar while
             if (line.startsWith("while")) {
                 processWhile(line, optimizedCode, i);
-                // Saltar el bloque del while
                 while (i < optimizedCode.size() && !optimizedCode.get(i).trim().equals("}")) {
                     i++;
                 }
@@ -60,68 +53,47 @@ public class AssemblyGenerator {
     private void processAssignment(String line) {
         String[] parts = line.split("=");
         String target = parts[0].trim();
-        String value = parts[1].trim().replace(";", ""); // Eliminar punto y coma
+        String value = parts[1].trim().replace(";", "");
         
-        // Si es un número (valor inmediato)
         if (value.matches("\\d+")) {
             assemblyCode.add("        MOV AX, " + value);
-            assemblyCode.add("        MOV [" + target + "], AX");
-        }
-        // Si es una variable
-        else if (value.matches("\\w+")) {
-            assemblyCode.add("        MOV AX, [" + value + "]");
-            assemblyCode.add("        MOV [" + target + "], AX");
-        }
-        // Si es una operación aritmética
-        else if (value.contains("+") || value.contains("-")) {
-            String[] operands = value.split("[+-]");
-            String operator = value.contains("+") ? "+" : "-";
-            
-            // Procesar primer operando
-            String op1 = operands[0].trim();
-            if (op1.matches("\\d+")) {
-                assemblyCode.add("        MOV AX, " + op1);
-            } else {
-                assemblyCode.add("        MOV AX, [" + op1 + "]");
+            assemblyCode.add("        MOV " + target + ", AX");
+        } else if (value.matches("\\w+")) {
+            assemblyCode.add("        MOV AX, " + value);
+            assemblyCode.add("        MOV " + target + ", AX");
+        } else {
+            // Handle complex expressions
+            String[] operations = value.split(" ");
+            for (String operation : operations) {
+                if (operation.matches("\\d+")) {
+                    assemblyCode.add("        MOV BX, " + operation);
+                } else if (operation.matches("\\w+")) {
+                    assemblyCode.add("        MOV BX, " + operation);
+                } else if (operation.equals("*")) {
+                    assemblyCode.add("        MUL BX");
+                } else if (operation.equals("-")) {
+                    assemblyCode.add("        SUB AX, BX");
+                } else if (operation.equals("+")) {
+                    assemblyCode.add("        ADD AX, BX");
+                }
             }
-            
-            // Procesar segundo operando
-            String op2 = operands[1].trim();
-            if (op2.matches("\\d+")) {
-                assemblyCode.add("        MOV BX, " + op2);
-            } else {
-                assemblyCode.add("        MOV BX, [" + op2 + "]");
-            }
-            
-            if (operator.equals("+")) {
-                assemblyCode.add("        ADD AX, BX");
-            } else {
-                assemblyCode.add("        SUB AX, BX");
-            }
-            assemblyCode.add("        MOV [" + target + "], AX");
+            assemblyCode.add("        MOV " + target + ", AX");
         }
     }
     
     private void processWhile(String line, List<String> code, int startIndex) {
         String condition = extractCondition(line);
-        String labelStart = "START" + labelCounter++;
-        String labelBody = "BODY" + labelCounter++;
-        String labelEnd = "END" + labelCounter++;
+        String labelStart = "WhileLoop";
+        String labelEnd = "EndWhile";
         
         assemblyCode.add(labelStart + ":");
         
-        // Procesar condición
-        if (condition.contains("&&")) {
-            processAndCondition(condition, labelBody, labelEnd);
-        } else if (condition.contains("||")) {
-            processOrCondition(condition, labelBody, labelEnd);
-        } else {
-            processSimpleCondition(condition, labelBody, labelEnd);
+        // Process each condition separately
+        String[] conditions = condition.split("\\&\\&|\\|\\|");
+        for (String cond : conditions) {
+            processSimpleCondition(cond.trim(), labelStart, labelEnd);
         }
         
-        assemblyCode.add(labelBody + ":");
-        
-        // Procesar cuerpo del while
         int i = startIndex + 1;
         while (i < code.size() && !code.get(i).trim().equals("}")) {
             String bodyLine = code.get(i).trim();
@@ -246,24 +218,23 @@ public class AssemblyGenerator {
             
             assemblyCode.add("        MOV AX, [" + left + "]");
             if (right.matches("\\d+")) {
-                assemblyCode.add("        MOV BX, " + right);
+                assemblyCode.add("        CMP AX, " + right);
             } else {
-                assemblyCode.add("        MOV BX, [" + right + "]");
+                assemblyCode.add("        CMP AX, " + right);
             }
-            assemblyCode.add("        CMP AX, BX");
             
             switch (operator) {
                 case ">":
-                    assemblyCode.add("        JG " + labelBody);
+                    assemblyCode.add("        JGE " + labelEnd);
                     break;
                 case "<":
-                    assemblyCode.add("        JL " + labelBody);
+                    assemblyCode.add("        JLE " + labelEnd);
                     break;
                 case "==":
-                    assemblyCode.add("        JE " + labelBody);
+                    assemblyCode.add("        JNE " + labelEnd);
                     break;
                 case "!=":
-                    assemblyCode.add("        JNE " + labelBody);
+                    assemblyCode.add("        JE " + labelEnd);
                     break;
             }
         }
