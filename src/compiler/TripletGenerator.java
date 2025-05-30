@@ -3,6 +3,7 @@ package src.compiler;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Stack;
 import java.util.regex.Matcher;
@@ -12,7 +13,7 @@ public class TripletGenerator {
     private List<TriploEntry> triploEntries;
     private Stack<Integer> conditionPositions; // Para almacenar posiciones de inicio de condición
     private Stack<Integer> pendingJumps;      // Para almacenar posiciones de saltos que necesitan actualizarse
-    private Optimizer optimizer;
+    private CodeOptimizer optimizer;
     private String originalCode;
     private List<String> optimizedCode;
 
@@ -20,7 +21,7 @@ public class TripletGenerator {
         this.triploEntries = new ArrayList<>();
         this.conditionPositions = new Stack<>();
         this.pendingJumps = new Stack<>();
-        this.optimizer = new Optimizer();
+        this.optimizer = new CodeOptimizer();
         this.optimizedCode = new ArrayList<>();
     }
 
@@ -39,7 +40,7 @@ public class TripletGenerator {
         optimizedCode.clear();
         
         // Optimizar el código antes de generar el triplo
-        optimizedCode = optimizer.optimize(code);
+        optimizedCode = Arrays.asList(optimizer.optimize(code).split("\n"));
         
         // Analizar el código línea por línea
         for (int i = 0; i < optimizedCode.size(); i++) {
