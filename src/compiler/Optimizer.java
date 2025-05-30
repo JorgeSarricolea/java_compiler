@@ -118,6 +118,7 @@ public class Optimizer {
         }
         
         // Tercera pasada: procesar el código optimizado
+        boolean addedPrecomputed = false;
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.isEmpty()) continue;
@@ -148,7 +149,21 @@ public class Optimizer {
                     otherLines.addAll(optimizedBlock);
                     otherLines.add(getIndentation(lines[i]) + "}");
                 } else {
-                    // Eliminar la lógica que verifica el uso de variables
+                    // Detectar y precomputar expresiones constantes
+                    Pattern constExprPattern = Pattern.compile("\\b(\\d+\\s*[+\\-*/]\\s*\\d+)+\\b");
+                    Matcher matcher = constExprPattern.matcher(line);
+                    while (matcher.find()) {
+                        String constExpr = matcher.group();
+                        try {
+                            int result = evaluateExpression(constExpr);
+                            String varName = "JSJa" + (declarations.size() + 1);
+                            declarations.add("IntegerType " + varName + ";");
+                            otherLines.add(varName + " = " + result + ";");
+                            line = line.replace(constExpr, varName);
+                        } catch (Exception e) {
+                            // Si no se puede evaluar, continuar
+                        }
+                    }
                     otherLines.add(getIndentation(lines[i]) + line);
                 }
             }
@@ -363,6 +378,17 @@ public class Optimizer {
             return matcher.group(1);
         }
         return "";
+    }
+    
+    /**
+     * Evaluates a simple arithmetic expression
+     * @param expression The expression to evaluate
+     * @return The result of the evaluation
+     */
+    private int evaluateExpression(String expression) throws Exception {
+        // Simple evaluation logic for demonstration purposes
+        // This should be replaced with a proper expression parser
+        return (int) new javax.script.ScriptEngineManager().getEngineByName("JavaScript").eval(expression);
     }
     
     public static void main(String[] args) {
