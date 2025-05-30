@@ -38,7 +38,7 @@ public class Optimizer {
         List<String> declarations = new ArrayList<>();
         List<String> otherLines = new ArrayList<>();
         
-        // Primera pasada: identificar variables declaradas
+        // Primera pasada: identificar variables declaradas y no inicializadas
         for (String line : lines) {
             line = line.trim();
             if (line.isEmpty()) continue;
@@ -51,7 +51,7 @@ public class Optimizer {
             }
         }
         
-        // Segunda pasada: analizar uso de variables
+        // Segunda pasada: analizar uso de variables y detectar inicializaciones
         for (int i = 0; i < lines.length; i++) {
             String line = lines[i].trim();
             if (line.isEmpty()) continue;
@@ -60,6 +60,7 @@ public class Optimizer {
             if (line.contains("=")) {
                 String targetVar = extractTargetVariable(line);
                 if (declaredVariables.contains(targetVar)) {
+                    assignedVariables.add(targetVar);
                     // Buscar si la variable se usa en alguna línea después de su asignación
                     boolean isUsed = false;
                     for (int j = i + 1; j < lines.length; j++) {
@@ -79,16 +80,39 @@ public class Optimizer {
                 }
             }
             
-            // Analizar uso en condiciones de while
+            // Analizar uso en condiciones de while y su cuerpo
             if (line.startsWith("while")) {
                 String condition = extractCondition(line);
-                Pattern varPattern = Pattern.compile("\\b\\w+\\b");
-                Matcher varMatcher = varPattern.matcher(condition);
-                while (varMatcher.find()) {
-                    String var = varMatcher.group();
-                    if (declaredVariables.contains(var)) {
-                        usedVariables.add(var);
+                // Marcar todas las variables en la condición como usadas
+                String[] conditionParts = condition.split("&&|\\|\\|");
+                for (String part : conditionParts) {
+                    part = part.trim();
+                    // Extraer variables de cada parte de la condición
+                    Pattern varPattern = Pattern.compile("\\b\\w+\\b");
+                    Matcher varMatcher = varPattern.matcher(part);
+                    while (varMatcher.find()) {
+                        String var = varMatcher.group();
+                        if (declaredVariables.contains(var)) {
+                            usedVariables.add(var);
+                        }
                     }
+                }
+                
+                // Analizar el cuerpo del while
+                int j = i + 1;
+                while (j < lines.length && !lines[j].trim().equals("}")) {
+                    String bodyLine = lines[j].trim();
+                    if (!bodyLine.isEmpty()) {
+                        Pattern varPattern = Pattern.compile("\\b\\w+\\b");
+                        Matcher varMatcher = varPattern.matcher(bodyLine);
+                        while (varMatcher.find()) {
+                            String var = varMatcher.group();
+                            if (declaredVariables.contains(var)) {
+                                usedVariables.add(var);
+                            }
+                        }
+                    }
+                    j++;
                 }
             }
         }
@@ -99,53 +123,33 @@ public class Optimizer {
             if (line.isEmpty()) continue;
             
             if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
-                // Las declaraciones se procesarán después
-                continue;
-            }
-            
-            // Si es un while, procesar su bloque
-            if (line.startsWith("while")) {
-                // Optimizar la condición del while
-                String optimizedCondition = optimizeWhileCondition(lines, i);
-                otherLines.add(getIndentation(lines[i]) + "while (" + optimizedCondition + ") {");
-                i++; // Saltar la llave de apertura
-                
-                // Procesar el bloque del while
-                List<String> blockLines = new ArrayList<>();
-                while (i < lines.length && !lines[i].trim().equals("}")) {
-                    blockLines.add(lines[i]);
-                    i++;
-                }
-                
-                // Optimizar el bloque
-                List<String> optimizedBlock = optimizeBlock(blockLines);
-                otherLines.addAll(optimizedBlock);
-                otherLines.add(getIndentation(lines[i]) + "}");
-            } else {
-                // Verificar si la línea es una asignación
-                if (line.contains("=")) {
-                    String targetVar = extractTargetVariable(line);
-                    // Solo mantener asignaciones de variables que se usan
-                    if (usedVariables.contains(targetVar)) {
-                        otherLines.add(getIndentation(lines[i]) + line);
-                    }
-                } else {
-                    otherLines.add(getIndentation(lines[i]) + line);
-                }
-            }
-        }
-        
-        // Cuarta pasada: procesar declaraciones
-        for (String line : lines) {
-            String originalIndentation = getIndentation(line);
-            line = line.trim();
-            if (line.isEmpty()) continue;
-            
-            if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
                 String varName = extractVariableName(line);
-                // Solo mantener variables que se usan en el código
-                if (usedVariables.contains(varName)) {
-                    declarations.add(originalIndentation + line);
+                // Mantener solo las declaraciones de variables que se usan
+                if (usedVariables.contains(varName) || assignedVariables.contains(varName)) {
+                    declarations.add(getIndentation(lines[i]) + line);
+                }
+            } else {
+                // Si es un while, procesar su bloque
+                if (line.startsWith("while")) {
+                    // Optimizar la condición del while
+                    String optimizedCondition = optimizeWhileCondition(lines, i);
+                    otherLines.add(getIndentation(lines[i]) + "while (" + optimizedCondition + ") {");
+                    i++; // Saltar la llave de apertura
+                    
+                    // Procesar el bloque del while
+                    List<String> blockLines = new ArrayList<>();
+                    while (i < lines.length && !lines[i].trim().equals("}")) {
+                        blockLines.add(lines[i]);
+                        i++;
+                    }
+                    
+                    // Optimizar el bloque
+                    List<String> optimizedBlock = optimizeBlock(blockLines);
+                    otherLines.addAll(optimizedBlock);
+                    otherLines.add(getIndentation(lines[i]) + "}");
+                } else {
+                    // Eliminar la lógica que verifica el uso de variables
+                    otherLines.add(getIndentation(lines[i]) + line);
                 }
             }
         }
@@ -153,6 +157,28 @@ public class Optimizer {
         // Combinar declaraciones y líneas optimizadas
         optimizedCode.addAll(declarations);
         optimizedCode.addAll(otherLines);
+        
+        // Verificar si el código optimizado es diferente del original
+        List<String> originalLines = new ArrayList<>();
+        for (String line : lines) {
+            if (!line.trim().isEmpty()) {
+                originalLines.add(line);
+            }
+        }
+        
+        // Si no hay cambios significativos, devolver el código original
+        if (optimizedCode.size() == originalLines.size()) {
+            boolean hasChanges = false;
+            for (int i = 0; i < optimizedCode.size(); i++) {
+                if (!optimizedCode.get(i).trim().equals(originalLines.get(i).trim())) {
+                    hasChanges = true;
+                    break;
+                }
+            }
+            if (!hasChanges) {
+                return originalLines;
+            }
+        }
         
         return optimizedCode;
     }
@@ -172,7 +198,6 @@ public class Optimizer {
             
             if (line.contains("=")) {
                 String[] parts = line.split("=");
-                String targetVar = parts[0].trim();
                 String expression = parts[1].trim();
                 
                 // Si la expresión es una condición booleana
@@ -256,7 +281,6 @@ public class Optimizer {
             // Si hay una siguiente línea
             if (i + 1 < blockLines.size()) {
                 String nextLine = blockLines.get(i + 1);
-                String nextIndentation = getIndentation(nextLine);
                 nextLine = nextLine.trim();
                 
                 // Verificar si son instrucciones dependientes
@@ -290,8 +314,6 @@ public class Optimizer {
         
         if (matcher1.find() && matcher2.find()) {
             String targetVar1 = matcher1.group(1);
-            String expression1 = matcher1.group(2);
-            String targetVar2 = matcher2.group(1);
             String expression2 = matcher2.group(2);
             
             // Verificar si la segunda línea usa la variable de la primera
@@ -341,5 +363,20 @@ public class Optimizer {
             return matcher.group(1);
         }
         return "";
+    }
+    
+    public static void main(String[] args) {
+        Optimizer optimizer = new Optimizer();
+        String code = "IntegerType JSJa1, JSJa2;\n" +
+                      "JSJa1 = 10;\n" +
+                      "JSJa2 = 5;\n" +
+                      "\n" +
+                      "while (JSJa1 < 20 && JSJa1 > 0) {\n" +
+                      "    JSJa1 = JSJa1 + 2 * 3 - 1;\n" +
+                      "}";
+        List<String> optimizedCode = optimizer.optimize(code);
+        for (String line : optimizedCode) {
+            System.out.println(line);
+        }
     }
 } 
