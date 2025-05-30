@@ -382,6 +382,88 @@ while (JSJa1 < JSJb1 && JSJa1 != JSJc1) {
 | 20   |             | JMP         | 7        |
 | 21   |             | end         |          |
 
+## Example with Triplet and Assembly
+
+### Code Example
+
+```java
+IntegerType JSJa1, JSJa2;
+JSJa1 = 10;
+JSJa2 = 5;
+
+while (JSJa1 < 20 && JSJa2 > 0) {
+    JSJa1 = JSJa1 + 2 * 3 - 1;
+    JSJa2 = JSJa2 - 1;
+}
+```
+
+#### Generated Triplet:
+
+| Line | Data Object | Data Source | Operator |
+| ---- | ----------- | ----------- | -------- |
+| 1    | T1          | 10          | =        |
+| 2    | JSJa1       | T1          | =        |
+| 3    | T2          | 5           | =        |
+| 4    | JSJa2       | T2          | =        |
+| 5    | T3          | 20          | =        |
+| 6    | T4          | JSJa1       | =        |
+| 7    | T4          | T3          | <        |
+| 8    | TR1         | true        | 10       |
+| 9    | TR1         | false       | 18       |
+| 10   | T5          | 0           | =        |
+| 11   | T6          | JSJa2       | =        |
+| 12   | T6          | T5          | >        |
+| 13   | TR1         | true        | 15       |
+| 14   | TR1         | false       | 18       |
+| 15   | T7          | JSJa1       | =        |
+| 16   | T8          | 2           | \*       |
+| 17   | T8          | 3           | \*       |
+| 18   | T7          | T8          | +        |
+| 19   | T7          | 1           | -        |
+| 20   | JSJa1       | T7          | =        |
+| 21   | T9          | JSJa2       | =        |
+| 22   | T9          | 1           | -        |
+| 23   | JSJa2       | T9          | =        |
+| 24   |             | JMP         | 5        |
+| 25   |             | end         |          |
+
+#### Generated Assembly:
+
+```asm
+MOV AX, 10
+MOV JSJa1, AX
+
+MOV AX, 5
+MOV JSJa2, AX
+
+WhileLoop:
+MOV AX, JSJa1
+CMP AX, 20
+JGE EndWhile
+
+MOV AX, JSJa2
+CMP AX, 0
+JLE EndWhile
+
+MOV AX, JSJa1
+MOV BX, 2
+MUL BX
+
+MOV BX, 3
+MUL BX
+
+SUB AX, 1
+MOV JSJa1, AX
+
+MOV AX, JSJa2
+SUB AX, 1
+MOV JSJa2, AX
+
+JMP WhileLoop
+
+EndWhile:
+```
+
 ## Code Style
 
 - Variables must follow the pattern: JSJ[a-z][0-9]+
