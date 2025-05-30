@@ -2,267 +2,179 @@ package src.compiler;
 
 import java.io.FileWriter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
+import java.util.Stack;
 
 public class AssemblyGenerator {
-    private List<String> assemblyCode;
-    private int labelCounter;
-    
+
+    private StringBuilder assemblyCode;
+    private int tempCount = 1;
+    private Stack<String> tempStack = new Stack<>();
+    private String finalTarget = null;
+
     public AssemblyGenerator() {
-        this.assemblyCode = new ArrayList<>();
-        this.labelCounter = 0;
+        this.assemblyCode = new StringBuilder();
     }
-    
+
     public void generateAssembly(List<String> optimizedCode) {
-        assemblyCode.clear();
-        labelCounter = 0;
-        
-        // Initialize variables directly
+        int labelCounter = 1;
+
         for (String line : optimizedCode) {
-            if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
-                String varName = extractVariableName(line);
-                assemblyCode.add("        MOV AX, 0");
-                assemblyCode.add("        MOV " + varName + ", AX");
-            }
-        }
-        
-        for (int i = 0; i < optimizedCode.size(); i++) {
-            String line = optimizedCode.get(i).trim();
+            line = line.trim();
             if (line.isEmpty()) continue;
-            
-            if (line.matches("(IntegerType|FloatType|StringType)\\s+.*")) {
-                continue;
-            }
-            
-            if (line.contains("=")) {
+
+            if (line.contains("=") && !line.contains("while")) {
                 processAssignment(line);
-            }
-            
-            if (line.startsWith("while")) {
-                processWhile(line, optimizedCode, i);
-                while (i < optimizedCode.size() && !optimizedCode.get(i).trim().equals("}")) {
-                    i++;
-                }
+            } else if (line.startsWith("while")) {
+                String labelStart = "LOOP_START" + labelCounter;
+                String labelEnd = "LOOP_END" + labelCounter;
+                labelCounter++;
+
+                assemblyCode.append(labelStart).append(":\n");
+                processCondition(line, labelEnd);
+            } else if (line.equals("}")) {
+                assemblyCode.append("    JMP LOOP_START" + (labelCounter - 1) + "\n");
+                assemblyCode.append("LOOP_END" + (labelCounter - 1) + ":\n");
             }
         }
+
+        assemblyCode.append("    ; End of program\nEND:\n");
     }
-    
+
     private void processAssignment(String line) {
+        line = line.replace(";", "");
         String[] parts = line.split("=");
+        if (parts.length != 2) return;
+
         String target = parts[0].trim();
-        String value = parts[1].trim().replace(";", "");
-        
-        if (value.matches("\\d+")) {
-            assemblyCode.add("        MOV AX, " + value);
-            assemblyCode.add("        MOV " + target + ", AX");
-        } else if (value.matches("\\w+")) {
-            assemblyCode.add("        MOV AX, " + value);
-            assemblyCode.add("        MOV " + target + ", AX");
-        } else {
-            // Handle complex expressions
-            String[] operations = value.split(" ");
-            for (String operation : operations) {
-                if (operation.matches("\\d+")) {
-                    assemblyCode.add("        MOV AL, " + operation);
-                } else if (operation.matches("\\w+")) {
-                    assemblyCode.add("        MOV BL, " + operation);
-                } else if (operation.equals("*")) {
-                    assemblyCode.add("        MUL BL");
-                } else if (operation.equals("-")) {
-                    assemblyCode.add("        SUB AX, 1");
-                } else if (operation.equals("+")) {
-                    assemblyCode.add("        ADD BX, AX");
-                }
-            }
-            assemblyCode.add("        MOV " + target + ", BX");
-        }
+        String expr = parts[1].trim();
+
+        finalTarget = target;
+        tempStack.clear();
+        generateExpr(expr);
+        finalTarget = null;
     }
-    
-    private void processWhile(String line, List<String> code, int startIndex) {
-        String condition = extractCondition(line);
-        String labelStart = "WhileLoop";
-        String labelEnd = "EndWhile";
-        
-        assemblyCode.add(labelStart + ":");
-        
-        // Process each condition separately
-        String[] conditions = condition.split("\\&\\&|\\|\\|");
-        for (String cond : conditions) {
-            processSimpleCondition(cond.trim(), labelStart, labelEnd);
-        }
-        
-        int i = startIndex + 1;
-        while (i < code.size() && !code.get(i).trim().equals("}")) {
-            String bodyLine = code.get(i).trim();
-            if (!bodyLine.isEmpty()) {
-                processAssignment(bodyLine);
+
+    private void generateExpr(String expr) {
+        String[] addSubParts = expr.split("(?=[+-])");
+        for (int i = 0; i < addSubParts.length; i++) {
+            String part = addSubParts[i].trim();
+            if (part.isEmpty()) continue;
+
+            char op = '+';
+            if (part.charAt(0) == '+' || part.charAt(0) == '-') {
+                op = part.charAt(0);
+                part = part.substring(1).trim();
             }
-            i++;
-        }
-        
-        assemblyCode.add("        JMP " + labelStart);
-        assemblyCode.add(labelEnd + ":");
-    }
-    
-    private void processAndCondition(String condition, String labelBody, String labelEnd) {
-        String[] parts = condition.split("&&");
-        
-        // Procesar cada condición individualmente
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i].trim();
-            
-            // Extraer los operandos y el operador
-            Pattern pattern = Pattern.compile("(\\w+)\\s*([<>=!]+)\\s*(\\w+)");
-            Matcher matcher = pattern.matcher(part);
-            
-            if (matcher.find()) {
-                String left = matcher.group(1);
-                String operator = matcher.group(2);
-                String right = matcher.group(3);
-                
-                // Cargar el valor de la variable izquierda
-                assemblyCode.add("        MOV AX, [" + left + "]");
-                
-                // Cargar el valor derecho (inmediato o variable)
-                if (right.matches("\\d+")) {
-                    assemblyCode.add("        MOV BX, " + right);
-                } else {
-                    assemblyCode.add("        MOV BX, [" + right + "]");
-                }
-                
-                assemblyCode.add("        CMP AX, BX");
-                
-                // Generar el salto condicional apropiado
-                switch (operator) {
-                    case ">":
-                        assemblyCode.add("        JLE " + labelEnd);  // Si no es mayor, salir
-                        break;
-                    case "<":
-                        assemblyCode.add("        JGE " + labelEnd);  // Si no es menor, salir
-                        break;
-                    case "==":
-                        assemblyCode.add("        JNE " + labelEnd);  // Si no es igual, salir
-                        break;
-                    case "!=":
-                        assemblyCode.add("        JE " + labelEnd);   // Si es igual, salir
-                        break;
-                }
-            }
-        }
-        
-        // Si todas las condiciones se cumplen, continuar con el cuerpo
-        assemblyCode.add("        JMP " + labelBody);
-    }
-    
-    private void processOrCondition(String condition, String labelBody, String labelEnd) {
-        String[] parts = condition.split("\\|\\|");
-        
-        // Procesar cada condición individualmente
-        for (int i = 0; i < parts.length; i++) {
-            String part = parts[i].trim();
-            
-            // Extraer los operandos y el operador
-            Pattern pattern = Pattern.compile("(\\w+)\\s*([<>=!]+)\\s*(\\w+)");
-            Matcher matcher = pattern.matcher(part);
-            
-            if (matcher.find()) {
-                String left = matcher.group(1);
-                String operator = matcher.group(2);
-                String right = matcher.group(3);
-                
-                // Cargar el valor de la variable izquierda
-                assemblyCode.add("        MOV AX, [" + left + "]");
-                
-                // Cargar el valor derecho (inmediato o variable)
-                if (right.matches("\\d+")) {
-                    assemblyCode.add("        MOV BX, " + right);
-                } else {
-                    assemblyCode.add("        MOV BX, [" + right + "]");
-                }
-                
-                assemblyCode.add("        CMP AX, BX");
-                
-                // Generar el salto condicional apropiado
-                switch (operator) {
-                    case ">":
-                        assemblyCode.add("        JG " + labelBody);  // Si es mayor, ir al cuerpo
-                        break;
-                    case "<":
-                        assemblyCode.add("        JL " + labelBody);  // Si es menor, ir al cuerpo
-                        break;
-                    case "==":
-                        assemblyCode.add("        JE " + labelBody);  // Si es igual, ir al cuerpo
-                        break;
-                    case "!=":
-                        assemblyCode.add("        JNE " + labelBody); // Si no es igual, ir al cuerpo
-                        break;
-                }
-            }
-        }
-        
-        // Si ninguna condición se cumplió, salir
-        assemblyCode.add("        JMP " + labelEnd);
-    }
-    
-    private void processSimpleCondition(String condition, String labelBody, String labelEnd) {
-        Pattern pattern = Pattern.compile("(\\w+)\\s*([<>=!]+)\\s*(\\w+)");
-        Matcher matcher = pattern.matcher(condition);
-        
-        if (matcher.find()) {
-            String left = matcher.group(1);
-            String operator = matcher.group(2);
-            String right = matcher.group(3);
-            
-            assemblyCode.add("        MOV AX, [" + left + "]");
-            if (right.matches("\\d+")) {
-                assemblyCode.add("        CMP AX, " + right);
+
+            String term = evaluateMulDiv(part);
+
+            if (i == 0 && op == '+') {
+                tempStack.push(term);
             } else {
-                assemblyCode.add("        CMP AX, " + right);
+                String left = tempStack.pop();
+                assemblyCode.append("    MOV AL, ").append(left).append("\n");
+                if (op == '+') {
+                    assemblyCode.append("    ADD AL, ").append(term).append("\n");
+                } else {
+                    assemblyCode.append("    SUB AL, ").append(term).append("\n");
+                }
+
+                boolean isLast = (i == addSubParts.length - 1);
+                if (isLast && finalTarget != null) {
+                    assemblyCode.append("    MOV ").append(finalTarget).append(", AL\n");
+                } else {
+                    String tempResult = getTemp();
+                    assemblyCode.append("    MOV ").append(tempResult).append(", AL\n");
+                    tempStack.push(tempResult);
+                }
             }
-            
-            switch (operator) {
-                case ">":
-                    assemblyCode.add("        JGE " + labelEnd);
-                    break;
-                case "<":
-                    assemblyCode.add("        JLE " + labelEnd);
-                    break;
-                case "==":
-                    assemblyCode.add("        JNE " + labelEnd);
-                    break;
-                case "!=":
-                    assemblyCode.add("        JE " + labelEnd);
-                    break;
+        }
+
+        if (addSubParts.length == 1) {
+            String onlyTerm = tempStack.pop();
+            if (finalTarget != null) {
+                assemblyCode.append("    MOV ").append(finalTarget).append(", ").append(onlyTerm).append("\n");
             }
         }
     }
-    
-    private String extractVariableName(String declaration) {
-        Pattern pattern = Pattern.compile("(IntegerType|FloatType|StringType)\\s+(\\w+)");
-        Matcher matcher = pattern.matcher(declaration);
-        if (matcher.find()) {
-            return matcher.group(2);
+
+    private String evaluateMulDiv(String expr) {
+        if (!expr.contains("*") && !expr.contains("/")) return expr;
+
+        String[] factors = expr.split("[*/]");
+        char[] ops = expr.replaceAll("[^*/]", "").toCharArray();
+
+        String left = factors[0].trim();
+        for (int i = 0; i < ops.length; i++) {
+            String right = factors[i + 1].trim();
+            char op = ops[i];
+            boolean isLast = (i == ops.length - 1);
+
+            if (op == '*') {
+                assemblyCode.append("    MOV AL, ").append(left).append("\n");
+                assemblyCode.append("    MOV BL, ").append(right).append("\n");
+                assemblyCode.append("    MUL BL\n");
+                if (isLast && finalTarget != null) {
+                    assemblyCode.append("    MOV ").append(finalTarget).append(", AX\n");
+                    return finalTarget;
+                } else {
+                    String result = getTemp();
+                    assemblyCode.append("    MOV ").append(result).append(", AX\n");
+                    left = result;
+                }
+            } else {
+                assemblyCode.append("    MOV AX, ").append(left).append("\n");
+                assemblyCode.append("    MOV BL, ").append(right).append("\n");
+                assemblyCode.append("    DIV BL\n");
+                if (isLast && finalTarget != null) {
+                    assemblyCode.append("    MOV ").append(finalTarget).append(", AL\n");
+                    return finalTarget;
+                } else {
+                    String result = getTemp();
+                    assemblyCode.append("    MOV ").append(result).append(", AL\n");
+                    left = result;
+                }
+            }
         }
-        return "";
+
+        return left;
     }
-    
-    private String extractCondition(String line) {
-        Pattern pattern = Pattern.compile("\\((.*?)\\)");
-        Matcher matcher = pattern.matcher(line);
-        if (matcher.find()) {
-            return matcher.group(1).trim();
+
+    private void processCondition(String line, String labelEnd) {
+        line = line.substring(line.indexOf('(') + 1, line.lastIndexOf(')'));
+        String[] conditions = line.split("&&");
+
+        for (String cond : conditions) {
+            cond = cond.trim();
+            String[] ops = null;
+            String op = null;
+            if (cond.contains("<")) {
+                ops = cond.split("<");
+                op = "JL";
+            } else if (cond.contains(">")) {
+                ops = cond.split(">");
+                op = "JG";
+            }
+
+            if (ops != null && op != null) {
+                String left = ops[0].trim();
+                String right = ops[1].trim();
+
+                assemblyCode.append("    MOV AX, ").append(left).append("\n");
+                assemblyCode.append("    CMP AX, ").append(right).append("\n");
+                assemblyCode.append("    JN").append(op.substring(1)).append(" ").append(labelEnd).append("\n");
+            }
         }
-        return "";
     }
-    
+
+    private String getTemp() {
+        return "TMP" + (tempCount++);
+    }
+
     public void saveToFile(String filePath) throws IOException {
         try (FileWriter writer = new FileWriter(filePath)) {
-            for (String line : assemblyCode) {
-                writer.write(line + "\n");
-            }
+            writer.write(assemblyCode.toString());
         }
     }
-} 
+}
