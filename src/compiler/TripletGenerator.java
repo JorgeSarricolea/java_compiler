@@ -89,9 +89,6 @@ public class TripletGenerator {
                     // La posición después del JMP será el final del bloque
                     int afterJmpPos = triploEntries.size() + 1;
                     
-                    // Crear una lista temporal para guardar los saltos de bloques externos
-                    Stack<Integer> outerJumps = new Stack<>();
-                    
                     // Actualizar todos los saltos pendientes del bloque actual para que apunten al final
                     while (!pendingJumps.isEmpty()) {
                         int pendingJumpPos = pendingJumps.pop();
