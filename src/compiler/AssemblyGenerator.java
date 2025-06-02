@@ -9,6 +9,7 @@ public class AssemblyGenerator {
 
     private StringBuilder assemblyCode;
     private int tempCount = 1;
+    private int labelCounter = 1;
     private Stack<String> tempStack = new Stack<>();
     private String finalTarget = null;
 
@@ -17,33 +18,40 @@ public class AssemblyGenerator {
     }
 
     public void generateAssembly(List<String> optimizedCode) {
-        int labelCounter = 1;
+        initializeVariables(optimizedCode);
 
         for (String line : optimizedCode) {
             line = line.trim();
-            if (line.isEmpty()) continue;
+            if (line.isEmpty() || line.startsWith("IntegerType")) continue;
 
-            if (line.contains("=") && !line.contains("while")) {
-                processAssignment(line);
-            } else if (line.startsWith("while")) {
-                String labelStart = "LOOP_START" + labelCounter;
-                String labelEnd = "LOOP_END" + labelCounter;
-                labelCounter++;
-
-                assemblyCode.append(labelStart).append(":\n");
-                processCondition(line, labelEnd);
+            if (line.startsWith("while")) {
+                generateWhile(line);
             } else if (line.equals("}")) {
-                assemblyCode.append("    JMP LOOP_START" + (labelCounter - 1) + "\n");
-                assemblyCode.append("LOOP_END" + (labelCounter - 1) + ":\n");
+                assemblyCode.append("    JMP LOOP_START").append(labelCounter - 1).append("\n");
+                assemblyCode.append("END_LOOP").append(labelCounter - 1).append(":\n");
+            } else if (line.contains("=")) {
+                processAssignment(line);
             }
         }
 
-        assemblyCode.append("    ; End of program\nEND:\n");
+        assemblyCode.append("END:\n");
+    }
+
+    private void initializeVariables(List<String> code) {
+        for (String line : code) {
+            if (line.startsWith("IntegerType")) {
+                String[] vars = line.replace("IntegerType", "").replace(";", "").split(",");
+                for (String var : vars) {
+                    String cleanVar = var.trim();
+                    assemblyCode.append("    MOV AX, 0\n");
+                    assemblyCode.append("    MOV ").append(cleanVar).append(", AX\n");
+                }
+            }
+        }
     }
 
     private void processAssignment(String line) {
-        line = line.replace(";", "");
-        String[] parts = line.split("=");
+        String[] parts = line.replace(";", "").split("=");
         if (parts.length != 2) return;
 
         String target = parts[0].trim();
@@ -57,47 +65,57 @@ public class AssemblyGenerator {
 
     private void generateExpr(String expr) {
         String[] addSubParts = expr.split("(?=[+-])");
+    
+        // Detección anticipada de cuál parte es multiplicación/división
+        int multIndex = -1;
+        String[] evaluatedTerms = new String[addSubParts.length];
+    
         for (int i = 0; i < addSubParts.length; i++) {
             String part = addSubParts[i].trim();
-            if (part.isEmpty()) continue;
-
+            if (part.startsWith("+") || part.startsWith("-")) {
+                part = part.substring(1).trim();
+            }
+    
+            String eval = evaluateMulDiv(part);
+            evaluatedTerms[i] = eval;
+    
+            if ("AX_RESULT".equals(eval)) {
+                multIndex = i;
+            }
+        }
+    
+        for (int i = 0; i < addSubParts.length; i++) {
+            String part = addSubParts[i].trim();
             char op = '+';
+    
             if (part.charAt(0) == '+' || part.charAt(0) == '-') {
                 op = part.charAt(0);
                 part = part.substring(1).trim();
             }
-
-            String term = evaluateMulDiv(part);
-
-            if (i == 0 && op == '+') {
-                tempStack.push(term);
+    
+            String term = evaluatedTerms[i];
+    
+            if (i == multIndex) {
+                // Ya se generó el código dentro de evaluateMulDiv
+                continue;
+            }
+    
+            if (multIndex == -1 && i == 0) {
+                assemblyCode.append("    MOV AX, ").append(term).append("\n");
             } else {
-                String left = tempStack.pop();
-                assemblyCode.append("    MOV AL, ").append(left).append("\n");
                 if (op == '+') {
-                    assemblyCode.append("    ADD AL, ").append(term).append("\n");
+                    assemblyCode.append("    ADD AX, ").append(term).append("\n");
                 } else {
-                    assemblyCode.append("    SUB AL, ").append(term).append("\n");
-                }
-
-                boolean isLast = (i == addSubParts.length - 1);
-                if (isLast && finalTarget != null) {
-                    assemblyCode.append("    MOV ").append(finalTarget).append(", AL\n");
-                } else {
-                    String tempResult = getTemp();
-                    assemblyCode.append("    MOV ").append(tempResult).append(", AL\n");
-                    tempStack.push(tempResult);
+                    assemblyCode.append("    SUB AX, ").append(term).append("\n");
                 }
             }
         }
-
-        if (addSubParts.length == 1) {
-            String onlyTerm = tempStack.pop();
-            if (finalTarget != null) {
-                assemblyCode.append("    MOV ").append(finalTarget).append(", ").append(onlyTerm).append("\n");
-            }
+    
+        if (finalTarget != null && !"AX".equals(finalTarget)) {
+            assemblyCode.append("    MOV ").append(finalTarget).append(", AX\n");
         }
     }
+    
 
     private String evaluateMulDiv(String expr) {
         if (!expr.contains("*") && !expr.contains("/")) return expr;
@@ -106,65 +124,65 @@ public class AssemblyGenerator {
         char[] ops = expr.replaceAll("[^*/]", "").toCharArray();
 
         String left = factors[0].trim();
+        boolean usedAX = false;
+
         for (int i = 0; i < ops.length; i++) {
             String right = factors[i + 1].trim();
             char op = ops[i];
-            boolean isLast = (i == ops.length - 1);
 
             if (op == '*') {
-                assemblyCode.append("    MOV AL, ").append(left).append("\n");
+                if (!"AL".equals(left)) {
+                    assemblyCode.append("    MOV AL, ").append(left).append("\n");
+                }
                 assemblyCode.append("    MOV BL, ").append(right).append("\n");
                 assemblyCode.append("    MUL BL\n");
-                if (isLast && finalTarget != null) {
-                    assemblyCode.append("    MOV ").append(finalTarget).append(", AX\n");
-                    return finalTarget;
-                } else {
-                    String result = getTemp();
-                    assemblyCode.append("    MOV ").append(result).append(", AX\n");
-                    left = result;
-                }
+                usedAX = true;
+                left = "AX";
             } else {
-                assemblyCode.append("    MOV AX, ").append(left).append("\n");
+                if (!"AX".equals(left)) {
+                    assemblyCode.append("    MOV AX, ").append(left).append("\n");
+                }
                 assemblyCode.append("    MOV BL, ").append(right).append("\n");
                 assemblyCode.append("    DIV BL\n");
-                if (isLast && finalTarget != null) {
-                    assemblyCode.append("    MOV ").append(finalTarget).append(", AL\n");
-                    return finalTarget;
-                } else {
-                    String result = getTemp();
-                    assemblyCode.append("    MOV ").append(result).append(", AL\n");
-                    left = result;
-                }
+                usedAX = true;
+                left = "AX";
             }
         }
 
-        return left;
+        return usedAX ? "AX_RESULT" : left;
     }
 
-    private void processCondition(String line, String labelEnd) {
+    private void generateWhile(String line) {
+        String loopLabel = "LOOP_START" + labelCounter;
+        String endLabel = "END_LOOP" + labelCounter;
+        labelCounter++;
+
+        assemblyCode.append(loopLabel).append(":\n");
+
         line = line.substring(line.indexOf('(') + 1, line.lastIndexOf(')'));
         String[] conditions = line.split("&&");
 
         for (String cond : conditions) {
             cond = cond.trim();
-            String[] ops = null;
-            String op = null;
+            String[] parts;
+            String jump = "";
+
             if (cond.contains("<")) {
-                ops = cond.split("<");
-                op = "JL";
+                parts = cond.split("<");
+                jump = "JGE"; // si NO es menor
             } else if (cond.contains(">")) {
-                ops = cond.split(">");
-                op = "JG";
+                parts = cond.split(">");
+                jump = "JLE"; // si NO es mayor
+            } else {
+                continue;
             }
 
-            if (ops != null && op != null) {
-                String left = ops[0].trim();
-                String right = ops[1].trim();
+            String left = parts[0].trim();
+            String right = parts[1].trim();
 
-                assemblyCode.append("    MOV AX, ").append(left).append("\n");
-                assemblyCode.append("    CMP AX, ").append(right).append("\n");
-                assemblyCode.append("    JN").append(op.substring(1)).append(" ").append(labelEnd).append("\n");
-            }
+            assemblyCode.append("    MOV AX, ").append(left).append("\n");
+            assemblyCode.append("    CMP AX, ").append(right).append("\n");
+            assemblyCode.append("    ").append(jump).append(" ").append(endLabel).append("\n");
         }
     }
 
