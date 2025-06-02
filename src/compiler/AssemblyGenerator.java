@@ -156,35 +156,36 @@ public class AssemblyGenerator {
         String loopLabel = "LOOP_START" + labelCounter;
         String endLabel = "END_LOOP" + labelCounter;
         labelCounter++;
-
+    
         assemblyCode.append(loopLabel).append(":\n");
-
+    
         line = line.substring(line.indexOf('(') + 1, line.lastIndexOf(')'));
         String[] conditions = line.split("&&");
-
+    
         for (String cond : conditions) {
             cond = cond.trim();
             String[] parts;
             String jump = "";
-
+    
             if (cond.contains("<")) {
                 parts = cond.split("<");
-                jump = "JGE"; // si NO es menor
+                jump = "LT"; // CORRECTO: salir si NO se cumple <
             } else if (cond.contains(">")) {
                 parts = cond.split(">");
-                jump = "JLE"; // si NO es mayor
+                jump = "GT"; // CORRECTO: salir si NO se cumple >
             } else {
                 continue;
             }
-
+    
             String left = parts[0].trim();
             String right = parts[1].trim();
-
+    
             assemblyCode.append("    MOV AX, ").append(left).append("\n");
             assemblyCode.append("    CMP AX, ").append(right).append("\n");
             assemblyCode.append("    ").append(jump).append(" ").append(endLabel).append("\n");
         }
     }
+    
 
     private String getTemp() {
         return "TMP" + (tempCount++);
